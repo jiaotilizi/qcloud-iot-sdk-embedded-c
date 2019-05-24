@@ -22,6 +22,7 @@ extern "C" {
 
 #include "qcloud_iot_export.h"
 #include "qcloud_iot_import.h"
+#include "qcloud_iot_sdk_impl_internal.h"
 
 int iot_device_info_init(void);
 

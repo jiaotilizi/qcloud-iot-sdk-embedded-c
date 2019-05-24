@@ -25,6 +25,67 @@ extern "C" {
 static DeviceInfo   sg_device_info;
 static bool         sg_devinfo_initialized;
 
+
+static char sg_flash_psk_file[] = "/usr/tencentyun_psk.txt";    /* 腾讯云产品设备密钥文件 */
+
+
+int IOT_Device_Info_Flash_Read(DeviceInfo *device_info) 
+{
+	FILE *fp = NULL;
+	int read_size = 0;
+
+	POINTER_SANITY_CHECK(device_info, QCLOUD_ERR_INVAL);
+	
+	memset(device_info, 0x0, sizeof(DeviceInfo));
+	
+	if (NULL == (fp = fopen(sg_flash_psk_file, "r+")))
+	{
+		Log_e("Open Device Info File Failed");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	read_size = fread(device_info, sizeof(DeviceInfo), 1, fp);
+	fclose(fp);
+
+	return (1 == read_size)? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
+}
+
+int IOT_Device_Info_Flash_Write(DeviceInfo *device_info) 
+{
+	FILE *fp = NULL;
+	int write_size = 0;
+
+	POINTER_SANITY_CHECK(device_info, QCLOUD_ERR_INVAL);
+	
+	if ((MAX_SIZE_OF_PRODUCT_ID) < strlen(device_info->product_id))
+	{
+		Log_e("product name(%s) length:(%lu) exceeding limitation", device_info->product_id, strlen(device_info->product_id));
+		return QCLOUD_ERR_FAILURE;
+	}
+	if ((MAX_SIZE_OF_DEVICE_NAME) < strlen(device_info->device_name))
+	{
+		Log_e("device name(%s) length:(%lu) exceeding limitation", device_info->device_name, strlen(device_info->device_name));
+		return QCLOUD_ERR_FAILURE;
+	}
+	if ((MAX_SIZE_OF_DEVICE_SERC) < strlen(device_info->devSerc))
+	{
+		Log_e("device secret(%s) length:(%lu) exceeding limitation", device_info->devSerc, strlen(device_info->devSerc));
+		return QCLOUD_ERR_FAILURE;
+	}
+	
+	if (NULL == (fp = fopen(sg_flash_psk_file, "w+")))
+	{
+		Log_e("Open Device Info File Failed");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	write_size = fwrite(device_info, sizeof(DeviceInfo), 1, fp);
+	fclose(fp);
+
+	return (1 == write_size)? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
+}
+
+
 int iot_device_info_init() {
 	if (sg_devinfo_initialized) {
 		Log_e("device info has been initialized.");

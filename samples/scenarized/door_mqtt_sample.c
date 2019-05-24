@@ -31,7 +31,7 @@
     static char sg_key_file[PATH_MAX + 1];       //客户端密钥全路径
 #endif
 
-static DeviceInfo sg_devInfo;
+//static DeviceInfo sg_devInfo;
 
 
 static bool sg_has_rev_ack = false;
@@ -106,14 +106,30 @@ static void event_handler(void *pclient, void *handle_context, MQTTEventMsg *msg
 static int _setup_connect_init_params(MQTTInitParams* initParams)
 {
 	int ret;
+	DeviceInfo info_write;
+	DeviceInfo info_read;
 	
-	ret = HAL_GetDevInfo((void *)&sg_devInfo);	
-	if(QCLOUD_ERR_SUCCESS != ret){
-		return ret;
-	}
+	memset(&info_write, 0, sizeof(DeviceInfo));
+	memset(&info_read, 0, sizeof(DeviceInfo));
 	
-	initParams->device_name = sg_devInfo.device_name;
-	initParams->product_id = sg_devInfo.product_id;
+	sprintf(info_write.product_id, "%s", "LN19CSVR64");
+	sprintf(info_write.device_name, "%s", "door1");
+	sprintf(info_write.devSerc, "%s", "BhKEOITUbhtxU2z7rW+d0Q==");
+	
+	ret = IOT_Device_Info_Flash_Read(&info_read);
+	Log_i("###### IOT_Device_Info_Flash_Read ret = %d, info: %s/%s/%s", 
+			ret, info_read.product_id, info_read.device_name, info_read.devSerc);
+	
+	ret = IOT_Device_Info_Flash_Write(&info_write);
+	Log_i("###### IOT_Device_Info_Flash_Write ret = %d, info: %s/%s/%s", 
+			ret, info_write.product_id, info_write.device_name, info_write.devSerc);
+	
+	ret = IOT_Device_Info_Flash_Read(&info_read);
+	Log_i("###### IOT_Device_Info_Flash_Read ret = %d, info: %s/%s/%s", 
+			ret, info_read.product_id, info_read.device_name, info_read.devSerc);
+
+	initParams->product_id = info_read.product_id;
+	initParams->device_name = info_read.device_name;
 
 #ifdef AUTH_MODE_CERT
 	/* 使用非对称加密*/
@@ -131,7 +147,7 @@ static int _setup_connect_init_params(MQTTInitParams* initParams)
 	initParams->cert_file = sg_cert_file;
 	initParams->key_file = sg_key_file;
 #else
-	initParams->device_secret = sg_devInfo.devSerc;
+    initParams->device_secret = info_read.devSerc;
 #endif
 
     
@@ -154,7 +170,11 @@ static int _publish_msg(void *client, char* action, char* targetDeviceName)
         return -1;
 
     char topic_name[128] = {0};
-    sprintf(topic_name,"%s/%s/%s", sg_devInfo.product_id, sg_devInfo.device_name, "event");
+	DeviceInfo info_read;
+	
+	IOT_Device_Info_Flash_Read(&info_read);
+	
+    sprintf(topic_name,"%s/%s/%s", info_read.product_id, info_read.device_name, "event");
 
     PublishParams pub_params = DEFAULT_PUB_PARAMS;
     pub_params.qos = QOS1;

@@ -105,6 +105,11 @@ typedef struct {
 #endif  	
 } DeviceInfo;
 
+
+int IOT_Device_Info_Flash_Read(DeviceInfo *device_info);
+int IOT_Device_Info_Flash_Write(DeviceInfo *device_info);
+
+
 #include "qcloud_iot_export_coap.h"
 #include "qcloud_iot_export_log.h"
 #include "qcloud_iot_export_error.h"

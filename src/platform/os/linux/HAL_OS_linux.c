@@ -33,11 +33,11 @@
 #ifdef DEBUG_DEV_INFO_USED
 
 /* 产品名称, 与云端同步设备状态时需要  */
-static char sg_product_id[MAX_SIZE_OF_PRODUCT_ID + 1]	 = "PRODUCT_ID";
+static char sg_product_id[MAX_SIZE_OF_PRODUCT_ID + 1]	 = "DXAJRHTNPE";
 /* 产品密钥, 与云端同步设备状态时需要  */
 static char sg_product_key[MAX_SIZE_OF_PRODUCT_KEY + 1]  = "YOUR_PRODUCT_KEY";
 /* 设备名称, 与云端同步设备状态时需要 */
-static char sg_device_name[MAX_SIZE_OF_DEVICE_NAME + 1]  = "YOUR_DEVICE_NAME";
+static char sg_device_name[MAX_SIZE_OF_DEVICE_NAME + 1]  = "airConditioner1";
 
 #ifdef AUTH_MODE_CERT
 /* 客户端证书文件名  非对称加密使用, TLS 证书认证方式*/
@@ -46,7 +46,7 @@ static char sg_device_cert_file_name[MAX_SIZE_OF_DEVICE_CERT_FILE_NAME + 1]     
 static char sg_device_privatekey_file_name[MAX_SIZE_OF_DEVICE_KEY_FILE_NAME + 1] = "YOUR_DEVICE_NAME_private.key";
 #else
 /* 设备密钥, TLS PSK认证方式*/
-static char sg_device_secret[MAX_SIZE_OF_DEVICE_SERC + 1] = "YOUR_IOT_PSK";
+static char sg_device_secret[MAX_SIZE_OF_DEVICE_SERC + 1] = "SK4IyovFFhoxYVpb4zFxVQ==";
 #endif
 
 #endif

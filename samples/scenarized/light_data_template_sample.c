@@ -477,7 +477,9 @@ int main(int argc, char **argv) {
 	int ReportCont;
 	Timer reportTimer;
 	int rc;
+#ifdef EVENT_POST_ENABLED
 	int i;
+#endif
 
 	
     //init log level
