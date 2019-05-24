@@ -93,12 +93,10 @@ typedef struct {
 	char 	device_name[MAX_SIZE_OF_DEVICE_NAME + 1];
 	char	client_id[MAX_SIZE_OF_CLIENT_ID + 1];
 	
-#ifdef AUTH_MODE_CERT
-	char  	devCertFileName[MAX_SIZE_OF_DEVICE_CERT_FILE_NAME + 1];
-	char 	devPrivateKeyFileName[MAX_SIZE_OF_DEVICE_KEY_FILE_NAME + 1];
-#else
-	char	devSerc[MAX_SIZE_OF_DEVICE_SERC + 1];
-#endif
+	char  	devCertFileName[MAX_SIZE_OF_DEVICE_CERT_FILE_NAME + 1];			/* AUTH_MODE_CERT_TLS 模式使用 */
+	char 	devPrivateKeyFileName[MAX_SIZE_OF_DEVICE_KEY_FILE_NAME + 1];	/* AUTH_MODE_CERT_TLS 模式使用 */
+	
+	char	devSerc[MAX_SIZE_OF_DEVICE_SERC + 1];							/* AUTH_MODE_KEY_NO_TLS/AUTH_MODE_KEY_TLS 模式使用 */
 
 #ifdef DEV_DYN_REG_ENABLED
 	char	product_key[MAX_SIZE_OF_PRODUCT_KEY + 1];

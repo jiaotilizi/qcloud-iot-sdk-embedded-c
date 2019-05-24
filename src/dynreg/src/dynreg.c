@@ -117,8 +117,6 @@ static int _get_json_encry_type(char *json) {
 	return type;
 }
 
-#ifndef AUTH_MODE_CERT
-
 static char * _get_json_psk(char *json) {
 
 	char *psk = LITE_json_value_of(PSK_DATA, json);
@@ -130,7 +128,6 @@ static char * _get_json_psk(char *json) {
 	return psk;
 }
 
-#else
 static char * _get_json_cert_data(char *json) {
 
 	char *cert = LITE_json_value_of(CERT_DATA, json);
@@ -197,8 +194,6 @@ exit:
     return Ret;
 }
 
-#endif
-
 
 static int _parse_devinfo(char *jdoc, DeviceInfo *pDevInfo)
 {
@@ -212,12 +207,10 @@ static int _parse_devinfo(char *jdoc, DeviceInfo *pDevInfo)
 	unsigned char iv[16];
 	char *payload = NULL;
 	
-#ifdef AUTH_MODE_CERT
-	char *clientCert;
-	char *clientKey;
-#else
-	char *psk;
-#endif
+	char *clientCert; 	/* AUTH_MODE_CERT_TLS 模式使用 */
+	char *clientKey; 	/* AUTH_MODE_CERT_TLS 模式使用 */
+	char *psk; 			/* AUTH_MODE_KEY_NO_TLS/AUTH_MODE_KEY_TLS 模式使用 */
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
 	
 	Log_d("recv：%s", jdoc);
 
@@ -265,68 +258,76 @@ static int _parse_devinfo(char *jdoc, DeviceInfo *pDevInfo)
 		goto exit;
 	}
 
-#ifdef AUTH_MODE_CERT
-	if(eCERT_TYPE != enType){
-		Log_e("encryt type should be cert type");
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
 		ret = QCLOUD_ERR_FAILURE;
 		goto exit;
 	}
 
-	clientCert = _get_json_cert_data(decodeBuff);
-	if(NULL != clientCert){
-		memset(pDevInfo->devCertFileName, 0, MAX_SIZE_OF_DEVICE_CERT_FILE_NAME);
-		HAL_Snprintf(pDevInfo->devCertFileName, MAX_SIZE_OF_DEVICE_CERT_FILE_NAME, "%s_cert.crt", pDevInfo->device_name);
-		if(QCLOUD_ERR_SUCCESS != _cert_file_save(pDevInfo->devCertFileName, clientCert,	strlen(clientCert))){
-			Log_e("save %s file fail", pDevInfo->devCertFileName);
+	if (AUTH_MODE_CERT_TLS == authmode) 
+	{
+		if(eCERT_TYPE != enType){
+			Log_e("encryt type should be cert type");
 			ret = QCLOUD_ERR_FAILURE;
+			goto exit;
 		}
 
-		HAL_Free(clientCert);
-		
-	}else{
-		Log_e("Get clientCert data fail");
-		ret = QCLOUD_ERR_FAILURE;
-	}
+		clientCert = _get_json_cert_data(decodeBuff);
+		if(NULL != clientCert){
+			memset(pDevInfo->devCertFileName, 0, MAX_SIZE_OF_DEVICE_CERT_FILE_NAME);
+			HAL_Snprintf(pDevInfo->devCertFileName, MAX_SIZE_OF_DEVICE_CERT_FILE_NAME, "%s_cert.crt", pDevInfo->device_name);
+			if(QCLOUD_ERR_SUCCESS != _cert_file_save(pDevInfo->devCertFileName, clientCert,	strlen(clientCert))){
+				Log_e("save %s file fail", pDevInfo->devCertFileName);
+				ret = QCLOUD_ERR_FAILURE;
+			}
 
-	clientKey = _get_json_key_data(decodeBuff);
-	if(NULL != clientKey){
-		memset(pDevInfo->devPrivateKeyFileName, 0, MAX_SIZE_OF_DEVICE_KEY_FILE_NAME);
-		HAL_Snprintf(pDevInfo->devPrivateKeyFileName, MAX_SIZE_OF_DEVICE_KEY_FILE_NAME, "%s_private.key", pDevInfo->device_name);
-		if(QCLOUD_ERR_SUCCESS != _cert_file_save(pDevInfo->devPrivateKeyFileName, clientKey,	strlen(clientKey))){
-			Log_e("save %s file fail", pDevInfo->devPrivateKeyFileName);
-			ret = QCLOUD_ERR_FAILURE;
-		}
-
-		HAL_Free(clientKey);
-		
-	}else{
-		Log_e("Get clientCert data fail");
-		ret = QCLOUD_ERR_FAILURE;
-	}
-	
-#else
-	if(ePSK_TYPE != enType){
-		Log_e("encryt type should be psk type");	
-		ret = QCLOUD_ERR_FAILURE;
-		goto exit;
-	}
-
-	psk = _get_json_psk(decodeBuff);
-	if(NULL != psk){
-		if(strlen(psk) > MAX_SIZE_OF_DEVICE_SERC){
-			Log_e("psk exceed max len,%s", psk);
-			strcpy(pDevInfo->devSerc, psk);
+			HAL_Free(clientCert);
+			
 		}else{
-			strncpy(pDevInfo->devSerc, psk, MAX_SIZE_OF_DEVICE_SERC);
-			pDevInfo->devSerc[MAX_SIZE_OF_DEVICE_SERC] = '\0';
+			Log_e("Get clientCert data fail");
+			ret = QCLOUD_ERR_FAILURE;
 		}
-		HAL_Free(psk);
-		//Just for test,release should be deleted
-		//Log_d("Get psk %s", pDevInfo->devSerc);	
-	}else{
-		Log_e("Get psk data fail");
+
+		clientKey = _get_json_key_data(decodeBuff);
+		if(NULL != clientKey){
+			memset(pDevInfo->devPrivateKeyFileName, 0, MAX_SIZE_OF_DEVICE_KEY_FILE_NAME);
+			HAL_Snprintf(pDevInfo->devPrivateKeyFileName, MAX_SIZE_OF_DEVICE_KEY_FILE_NAME, "%s_private.key", pDevInfo->device_name);
+			if(QCLOUD_ERR_SUCCESS != _cert_file_save(pDevInfo->devPrivateKeyFileName, clientKey,	strlen(clientKey))){
+				Log_e("save %s file fail", pDevInfo->devPrivateKeyFileName);
+				ret = QCLOUD_ERR_FAILURE;
+			}
+
+			HAL_Free(clientKey);
+			
+		}else{
+			Log_e("Get clientCert data fail");
+			ret = QCLOUD_ERR_FAILURE;
+		}
 	}
-#endif
+	else
+	{
+		if(ePSK_TYPE != enType){
+			Log_e("encryt type should be psk type");	
+			ret = QCLOUD_ERR_FAILURE;
+			goto exit;
+		}
+
+		psk = _get_json_psk(decodeBuff);
+		if(NULL != psk){
+			if(strlen(psk) > MAX_SIZE_OF_DEVICE_SERC){
+				Log_e("psk exceed max len,%s", psk);
+				strcpy(pDevInfo->devSerc, psk);
+			}else{
+				strncpy(pDevInfo->devSerc, psk, MAX_SIZE_OF_DEVICE_SERC);
+				pDevInfo->devSerc[MAX_SIZE_OF_DEVICE_SERC] = '\0';
+			}
+			HAL_Free(psk);
+			//Just for test,release should be deleted
+			//Log_d("Get psk %s", pDevInfo->devSerc);	
+		}else{
+			Log_e("Get psk data fail");
+		}
+	}
 
 	
 exit:

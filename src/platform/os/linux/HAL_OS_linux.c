@@ -39,15 +39,17 @@ static char sg_product_key[MAX_SIZE_OF_PRODUCT_KEY + 1]  = "YOUR_PRODUCT_KEY";
 /* 设备名称, 与云端同步设备状态时需要 */
 static char sg_device_name[MAX_SIZE_OF_DEVICE_NAME + 1]  = "airConditioner1";
 
-#ifdef AUTH_MODE_CERT
 /* 客户端证书文件名  非对称加密使用, TLS 证书认证方式*/
 static char sg_device_cert_file_name[MAX_SIZE_OF_DEVICE_CERT_FILE_NAME + 1]      = "YOUR_DEVICE_NAME_cert.crt";
 /* 客户端私钥文件名 非对称加密使用, TLS 证书认证方式*/
 static char sg_device_privatekey_file_name[MAX_SIZE_OF_DEVICE_KEY_FILE_NAME + 1] = "YOUR_DEVICE_NAME_private.key";
-#else
+
 /* 设备密钥, TLS PSK认证方式*/
 static char sg_device_secret[MAX_SIZE_OF_DEVICE_SERC + 1] = "SK4IyovFFhoxYVpb4zFxVQ==";
-#endif
+
+
+static DeviceAuthMode sg_auth_mode = AUTH_MODE_MAX;
+
 
 #endif
 
@@ -260,7 +262,6 @@ int HAL_SetDevName(const char *pDevName)
 	return QCLOUD_ERR_FAILURE;
 #endif
 }
-#ifdef AUTH_MODE_CERT	//证书 认证方式
 
 int HAL_GetDevCertName(char *pDevCert, uint8_t maxlen)
 {
@@ -331,7 +332,6 @@ int HAL_SetDevPrivateKeyName(char *pDevPrivateKey)
 #endif
 }
 
-#else	//PSK 认证方式
 
 int HAL_GetDevSec(char *pDevSec, uint8_t maxlen)
 {
@@ -368,23 +368,28 @@ int HAL_SetDevSec(const char *pDevSec)
 	return QCLOUD_ERR_FAILURE;
 #endif
 }
-#endif
+
 
 int HAL_GetDevInfo(void *pdevInfo)
 {
 	int ret;
 	DeviceInfo *devInfo = (DeviceInfo *)pdevInfo;
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
 		
 	memset((char *)devInfo, 0, sizeof(DeviceInfo));
 	ret = HAL_GetProductID(devInfo->product_id, MAX_SIZE_OF_PRODUCT_ID);
 	ret |= HAL_GetDevName(devInfo->device_name, MAX_SIZE_OF_DEVICE_NAME); 
 	
-#ifdef 	AUTH_MODE_CERT
-	ret |= HAL_GetDevCertName(devInfo->devCertFileName, MAX_SIZE_OF_DEVICE_CERT_FILE_NAME);
-	ret |= HAL_GetDevPrivateKeyName(devInfo->devPrivateKeyFileName, MAX_SIZE_OF_DEVICE_KEY_FILE_NAME);
-#else
-	ret |= HAL_GetDevSec(devInfo->devSerc, MAX_SIZE_OF_PRODUCT_KEY);
-#endif 
+	ret |= HAL_GetAuthMode(&authmode);
+	if (AUTH_MODE_CERT_TLS == authmode)
+	{
+		ret |= HAL_GetDevCertName(devInfo->devCertFileName, MAX_SIZE_OF_DEVICE_CERT_FILE_NAME);
+		ret |= HAL_GetDevPrivateKeyName(devInfo->devPrivateKeyFileName, MAX_SIZE_OF_DEVICE_KEY_FILE_NAME);
+	}
+	else
+	{
+		ret |= HAL_GetDevSec(devInfo->devSerc, MAX_SIZE_OF_PRODUCT_KEY);
+	}
 
 	if(QCLOUD_ERR_SUCCESS != ret){
 		Log_e("Get device info err");
@@ -392,6 +397,38 @@ int HAL_GetDevInfo(void *pdevInfo)
 	}
 
 	return ret;
+}
+
+int HAL_GetAuthMode(DeviceAuthMode *mode)
+{
+#ifdef DEBUG_DEV_INFO_USED
+	if(mode == NULL) {
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	*mode = sg_auth_mode;
+
+	return QCLOUD_ERR_SUCCESS;
+#else
+	Log_e("HAL_GetAuthMode is not implement");
+	return QCLOUD_ERR_FAILURE;
+#endif
+}
+
+int HAL_SetAuthMode(DeviceAuthMode mode)
+{
+#ifdef DEBUG_DEV_INFO_USED
+	if(mode >= AUTH_MODE_MAX) {
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	sg_auth_mode = mode;
+
+	return QCLOUD_ERR_SUCCESS;
+#else
+	Log_e("HAL_SetAuthMode is not implement");
+	return QCLOUD_ERR_FAILURE;
+#endif
 }
 
 

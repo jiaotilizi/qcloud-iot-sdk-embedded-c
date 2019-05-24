@@ -254,6 +254,8 @@ int   IOT_COAP_GetMessageCode(void *pMessage) {
 }
 
 int qcloud_iot_coap_init(CoAPClient *pClient, CoAPInitParams *pParams) {
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
+	
     IOT_FUNC_ENTRY;
 
     POINTER_SANITY_CHECK(pClient, QCLOUD_ERR_INVAL);
@@ -274,45 +276,47 @@ int qcloud_iot_coap_init(CoAPClient *pClient, CoAPInitParams *pParams) {
     	pParams->command_timeout = MAX_COMMAND_TIMEOUT;
     pClient->command_timeout_ms = pParams->command_timeout;
 
-#ifndef AUTH_WITH_NOTLS
-#ifdef AUTH_MODE_CERT
-    bool certEmpty = (pParams->cert_file == NULL || pParams->key_file == NULL);
-	if (certEmpty) {
-		Log_e("cert file or key file is empty!");
-		IOT_FUNC_EXIT_RC(QCLOUD_ERR_INVAL);
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		IOT_FUNC_EXIT_RC(QCLOUD_ERR_FAILURE);
 	}
-	Log_d("cert file: %s", pParams->cert_file);
-	Log_d("key file: %s", pParams->key_file);
 
-    // TLS连接参数初始化
-	pClient->network_stack.ssl_connect_params.cert_file = pParams->cert_file;
-	pClient->network_stack.ssl_connect_params.key_file = pParams->key_file;
-    pClient->network_stack.ssl_connect_params.ca_crt = iot_ca_get();
-    pClient->network_stack.ssl_connect_params.ca_crt_len = strlen(pClient->network_stack.ssl_connect_params.ca_crt);
+	if (AUTH_MODE_CERT_TLS == authmode)
+	{
+	    bool certEmpty = (pParams->cert_file == NULL || pParams->key_file == NULL);
+		if (certEmpty) {
+			Log_e("cert file or key file is empty!");
+			IOT_FUNC_EXIT_RC(QCLOUD_ERR_INVAL);
+		}
+		Log_d("cert file: %s", pParams->cert_file);
+		Log_d("key file: %s", pParams->key_file);
 
-#else
-    pClient->network_stack.ssl_connect_params.psk_id = iot_device_info_get()->client_id;
-    if (pParams->device_secret != NULL) {
-        size_t src_len = strlen(pParams->device_secret);
-        size_t len;
-        memset(sg_psk_str, 0x00, DECODE_PSK_LENGTH);
-        qcloud_iot_utils_base64decode(sg_psk_str, sizeof( sg_psk_str ), &len, (unsigned char *)pParams->device_secret, src_len );
-        pClient->network_stack.ssl_connect_params.psk = (char *)sg_psk_str;
-        pClient->network_stack.ssl_connect_params.psk_length = len;
-        pClient->network_stack.ssl_connect_params.ca_crt = iot_ca_get();
-        pClient->network_stack.ssl_connect_params.ca_crt_len = strlen(pClient->network_stack.ssl_connect_params.ca_crt);
-    } else {
-        Log_e("psk is empty!");
-        IOT_FUNC_EXIT_RC(QCLOUD_ERR_INVAL);
-    }
-#endif
-
+	    // TLS连接参数初始化
+		pClient->network_stack.ssl_connect_params.cert_file = pParams->cert_file;
+		pClient->network_stack.ssl_connect_params.key_file = pParams->key_file;
+	    pClient->network_stack.ssl_connect_params.ca_crt = iot_ca_get();
+	    pClient->network_stack.ssl_connect_params.ca_crt_len = strlen(pClient->network_stack.ssl_connect_params.ca_crt);
+	}
+	else if (AUTH_MODE_KEY_TLS == authmode)
+	{
+	    pClient->network_stack.ssl_connect_params.psk_id = iot_device_info_get()->client_id;
+	    if (pParams->device_secret != NULL) {
+	        size_t src_len = strlen(pParams->device_secret);
+	        size_t len;
+	        memset(sg_psk_str, 0x00, DECODE_PSK_LENGTH);
+	        qcloud_iot_utils_base64decode(sg_psk_str, sizeof( sg_psk_str ), &len, (unsigned char *)pParams->device_secret, src_len );
+	        pClient->network_stack.ssl_connect_params.psk = (char *)sg_psk_str;
+	        pClient->network_stack.ssl_connect_params.psk_length = len;
+	        pClient->network_stack.ssl_connect_params.ca_crt = iot_ca_get();
+	        pClient->network_stack.ssl_connect_params.ca_crt_len = strlen(pClient->network_stack.ssl_connect_params.ca_crt);
+	    } else {
+	        Log_e("psk is empty!");
+	        IOT_FUNC_EXIT_RC(QCLOUD_ERR_INVAL);
+	    }
+	}
     pClient->network_stack.host = s_qcloud_iot_host;
     pClient->network_stack.port = s_qcloud_iot_port;
-#else
-    pClient->network_stack.host = s_qcloud_iot_host;
-    pClient->network_stack.port = s_qcloud_iot_port;
-#endif
 
     pClient->auth_token = NULL;
     pClient->auth_token_len = 0;

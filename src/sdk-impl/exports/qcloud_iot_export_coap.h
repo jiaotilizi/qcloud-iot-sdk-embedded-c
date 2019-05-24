@@ -88,12 +88,12 @@ typedef struct {
     char                        *product_id;              // 产品名称
     char                        *device_name;             // 设备名称
 
-#ifdef AUTH_MODE_CERT
+
     char                        *cert_file;              // 客户端证书文件路径
     char                        *key_file;               // 客户端私钥文件路径
-#else
+
     char                        *device_secret;                    // 对称加密密钥
-#endif
+    
 
     uint32_t					command_timeout;		 // coap消息等待回包ACK/RESP超时
 
@@ -103,11 +103,9 @@ typedef struct {
 
 } CoAPInitParams;
 
-#ifdef AUTH_MODE_CERT
-	#define DEFAULT_COAPINIT_PARAMS { NULL, NULL, NULL, NULL, 2000, 5, {0}}
-#else
-    #define DEFAULT_COAPINIT_PARAMS { NULL, NULL, NULL, 2000, 5, {0}}
-#endif
+
+#define DEFAULT_COAPINIT_PARAMS { NULL, NULL, NULL, NULL, NULL, 2000, 5, {0}}
+
 
 /**
  * @brief 构造COAPClient并完成连接和鉴权

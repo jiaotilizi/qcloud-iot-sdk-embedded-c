@@ -36,6 +36,13 @@ extern "C" {
 #define Max(a,b) ((a) > (b) ? (a) : (b))
 #define Min(a,b) ((a) < (b) ? (a) : (b))
 
+typedef enum {
+	AUTH_MODE_KEY_NO_TLS 	= 0,		/* 密钥认证模式, 无TLS加密 */
+	AUTH_MODE_KEY_TLS 		= 1,		/* 密钥认证模式, TLS加密 */
+	AUTH_MODE_CERT_TLS 		= 2,		/* 证书认证模式, TLS加密 */
+	AUTH_MODE_MAX,
+} DeviceAuthMode;
+
 
 /**
  * @brief 创建互斥锁
@@ -182,7 +189,7 @@ int HAL_SetProductKey(const char *pProductKey);
  * @return          返回QCLOUD_ERR_SUCCESS, 表示设置成功，否则设置失败
  */
 int HAL_SetDevName(const char *pDevName);
-#ifdef AUTH_MODE_CERT
+
 /**
  * @brief 获取设备端证书文件名
  *
@@ -217,7 +224,7 @@ int HAL_SetDevCertName(char *pDevCert);
  * @return          返回QCLOUD_ERR_SUCCESS, 表示设置成功，否则设置失败
  */
 int HAL_SetDevPrivateKeyName(char *pDevPrivateKey);
-#else
+
 /**
  * @brief 获取设备psk，TLS PSK认证方式
  *
@@ -233,7 +240,7 @@ int HAL_GetDevSec(char *pDevSec, uint8_t maxlen);
  * @return         返回QCLOUD_ERR_SUCCESS, 表示设置成功，否则设置失败
  */
 int HAL_SetDevSec(const char *pDevSec);
-#endif
+
 
 /**
  * @brief 获取设备信息
@@ -241,8 +248,24 @@ int HAL_SetDevSec(const char *pDevSec);
  * @param devInfo  待获取的设备信息指针
  * @return         返回QCLOUD_ERR_SUCCESS, 表示获取成功，否则获取失败
  */
-
 int HAL_GetDevInfo(void *devInfo);
+
+
+/**
+ * @brief 获取设备认证模式
+ *
+ * @param mode     待获取的设备认证模式指针
+ * @return         返回QCLOUD_ERR_SUCCESS, 表示设置成功，否则设置失败
+ */
+int HAL_GetAuthMode(DeviceAuthMode *mode);
+
+/**
+ * @brief 设置设备认证模式
+ *
+ * @param mode     待设置的设备认证模式
+ * @return         返回QCLOUD_ERR_SUCCESS, 表示设置成功，否则设置失败
+ */
+int HAL_SetAuthMode(DeviceAuthMode mode);
 
 
 /**
@@ -317,19 +340,19 @@ typedef struct {
     const char		 *ca_crt;
     uint16_t 		 ca_crt_len;
 
-#ifdef AUTH_MODE_CERT
+
 	/**
 	 * 非对称加密
 	 */
     const char       *cert_file;            // 客户端证书
     const char       *key_file;             // 客户端私钥
-#else
+    
     /**
      * 对称加密
      */
     const char       *psk;                  // 对称加密密钥
     const char       *psk_id;               // psk密钥ID
-#endif
+
 
     size_t           psk_length;            // psk长度
 

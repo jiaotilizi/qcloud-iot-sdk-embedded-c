@@ -35,18 +35,18 @@ typedef struct {
     char                        *product_id;            // 产品名称
     char                        *device_name;           // 设备名称
 
-#ifdef AUTH_MODE_CERT
+
     /**
      * 非对称加密使用
      */
     char                        *cert_file;              // 客户端证书文件路径
     char                        *key_file;               // 客户端私钥文件路径
-#else
+
     /**
      * 对称加密
      */
     char                        *device_secret;                    // 对称加密密钥
-#endif
+
 
     uint32_t                    command_timeout;         // 发布订阅信令读写超时时间 ms
     uint32_t                    keep_alive_interval_ms;  // 心跳周期, 单位: ms
@@ -59,11 +59,9 @@ typedef struct {
 	eShadowType					shadow_type;			//影子类型，eSHADOW：通用影子操作结果TOPIC eTEMPLATE：数据模板操作结果TOPIC
 } ShadowInitParams;
 
-#ifdef AUTH_MODE_CERT
-    #define DEFAULT_SHAWDOW_INIT_PARAMS { NULL, NULL, NULL, NULL, 2000, 240 * 1000, 1, 1, {0}}
-#else
-    #define DEFAULT_SHAWDOW_INIT_PARAMS { NULL, NULL, NULL, 2000, 240 * 1000, 1, 1, {0}}
-#endif
+
+#define DEFAULT_SHAWDOW_INIT_PARAMS { NULL, NULL, NULL, NULL, NULL, 2000, 240 * 1000, 1, 1, {0}}
+
 
 /**
  * @brief 请求响应返回的类型
