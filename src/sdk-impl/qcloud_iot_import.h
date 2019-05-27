@@ -330,7 +330,7 @@ char* HAL_Timer_current(void);
  */
 long HAL_Timer_current_sec(void);
 
-#ifndef AUTH_WITH_NOTLS
+
 /**
  * @brief TLS连接相关参数定义
  *
@@ -605,7 +605,6 @@ int HAL_UDP_Read(uintptr_t fd, unsigned char *p_data, unsigned int datalen);
  */
 int HAL_UDP_ReadTimeout(uintptr_t fd, unsigned char *p_data, unsigned int datalen, unsigned int timeout_ms);
 #endif
-#endif //NOTLS Enabled
 
 #if defined(__cplusplus)
 }

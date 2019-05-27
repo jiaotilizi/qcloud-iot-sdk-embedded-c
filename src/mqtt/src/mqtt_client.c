@@ -37,11 +37,9 @@ extern "C" {
 
 #define HOST_STR_LENGTH 64
 static char s_qcloud_iot_host[HOST_STR_LENGTH] = {0};
-#ifdef AUTH_WITH_NOTLS
-static int s_qcloud_iot_port = 1883;
-#else
-static int s_qcloud_iot_port = 8883;
-#endif
+// AUTH_WITH_NOTLS
+static int s_qcloud_iot_port_no_tls = 1883;
+static int s_qcloud_iot_port_tls = 8883;
 
 // AUTH_MODE_KEY_TLS
 #define DECODE_PSK_LENGTH 48		/*控制台允许的最大长度为64，对应到原文最大长度64/4*3 = 48*/
@@ -69,6 +67,7 @@ void* IOT_MQTT_Construct(MQTTInitParams *pParams)
     }
 
 	Qcloud_IoT_Client* mqtt_client = NULL;
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
 
 	// 初始化MQTTClient
 	if ((mqtt_client = (Qcloud_IoT_Client*) HAL_Malloc (sizeof(Qcloud_IoT_Client))) == NULL) {
@@ -89,19 +88,28 @@ void* IOT_MQTT_Construct(MQTTInitParams *pParams)
 	connect_params.keep_alive_interval = Min(pParams->keep_alive_interval_ms / 1000, 690);
 	connect_params.clean_session = pParams->clean_session;
 	connect_params.auto_connect_enable = pParams->auto_connect_enable;
-#if defined(AUTH_WITH_NOTLS) && defined(AUTH_MODE_KEY)
-	size_t src_len = strlen(pParams->device_secret);
-	size_t len;
-	memset(sg_psk_str, 0x00, DECODE_PSK_LENGTH);
-	rc = qcloud_iot_utils_base64decode(sg_psk_str, sizeof( sg_psk_str ), &len, (unsigned char *)pParams->device_secret, src_len );
-	connect_params.device_secret = (char *)sg_psk_str;
-	connect_params.device_secret_len = len;
-	if (rc != QCLOUD_ERR_SUCCESS) {
-		Log_e("Device secret decode err, secret:%s", pParams->device_secret);
-		HAL_Free(mqtt_client);
+
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
 		return NULL;
 	}
-#endif
+
+	if (AUTH_MODE_KEY_NO_TLS == authmode)
+	{
+		size_t src_len = strlen(pParams->device_secret);
+		size_t len;
+		memset(sg_psk_str, 0x00, DECODE_PSK_LENGTH);
+		rc = qcloud_iot_utils_base64decode(sg_psk_str, sizeof( sg_psk_str ), &len, (unsigned char *)pParams->device_secret, src_len );
+		connect_params.device_secret = (char *)sg_psk_str;
+		connect_params.device_secret_len = len;
+		if (rc != QCLOUD_ERR_SUCCESS) {
+			Log_e("Device secret decode err, secret:%s", pParams->device_secret);
+			HAL_Free(mqtt_client);
+			return NULL;
+		}
+	}
 
 	rc = qcloud_iot_mqtt_connect(mqtt_client, &connect_params);
 	if (rc != QCLOUD_ERR_SUCCESS) {
@@ -299,7 +307,7 @@ int qcloud_iot_mqtt_init(Qcloud_IoT_Client *pClient, MQTTInitParams *pParams) {
 	    pClient->network_stack.ssl_connect_params.ca_crt_len = strlen(pClient->network_stack.ssl_connect_params.ca_crt);
 		pClient->network_stack.ssl_connect_params.timeout_ms = QCLOUD_IOT_TLS_HANDSHAKE_TIMEOUT;
 		pClient->network_stack.host = s_qcloud_iot_host;
-    	pClient->network_stack.port = s_qcloud_iot_port;
+    	pClient->network_stack.port = s_qcloud_iot_port_tls;
 	}
 	else if (AUTH_MODE_KEY_TLS == authmode)
 	{
@@ -323,12 +331,12 @@ int qcloud_iot_mqtt_init(Qcloud_IoT_Client *pClient, MQTTInitParams *pParams) {
 	    pClient->network_stack.ssl_connect_params.ca_crt_len = strlen(pClient->network_stack.ssl_connect_params.ca_crt);
 		pClient->network_stack.ssl_connect_params.timeout_ms = QCLOUD_IOT_TLS_HANDSHAKE_TIMEOUT;
 		pClient->network_stack.host = s_qcloud_iot_host;
-    	pClient->network_stack.port = s_qcloud_iot_port;
+    	pClient->network_stack.port = s_qcloud_iot_port_tls;
 	}
 	else /* AUTH_MODE_KEY_NO_TLS == authmode */
 	{
 		pClient->network_stack.host = s_qcloud_iot_host;
-    	pClient->network_stack.port = s_qcloud_iot_port;
+    	pClient->network_stack.port = s_qcloud_iot_port_no_tls;
 	}
 
     // 底层网络操作相关的数据结构初始化

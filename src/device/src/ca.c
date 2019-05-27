@@ -21,7 +21,10 @@ extern "C" {
 
 #include <stdlib.h>
 
-#ifndef AUTH_WITH_NOTLS
+#include "qcloud_iot_export.h"
+#include "qcloud_iot_import.h"
+
+
 static const char *iot_ca_crt = \
 {
     "-----BEGIN CERTIFICATE-----\r\n"
@@ -99,22 +102,45 @@ static const char *iot_https_ca_crt = \
     "K1pp74P1S8SqtCr4fKGxhZSM9AyHDPSsQPhZSZg=\r\n"
     "-----END CERTIFICATE-----"
 };
-#endif
 
 const char *iot_ca_get() {
-#ifndef AUTH_WITH_NOTLS
-	return iot_ca_crt;
-#else
-    return NULL;
-#endif
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
+
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		return NULL;;
+	}
+
+	if ((AUTH_MODE_CERT_TLS == authmode) || (AUTH_MODE_KEY_TLS == authmode))
+	{
+		return iot_ca_crt;
+	}
+	else
+	{
+    	return NULL;
+	}
 }
 
 const char *iot_https_ca_get() {
-#ifndef AUTH_WITH_NOTLS
-	return iot_https_ca_crt;
-#else
-    return NULL;
-#endif
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
+	
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		return NULL;;
+	}
+	
+	if ((AUTH_MODE_CERT_TLS == authmode) || (AUTH_MODE_KEY_TLS == authmode))
+	{
+		return iot_https_ca_crt;
+	}
+	else
+	{
+    	return NULL;
+	}
 }
 
 #ifdef __cplusplus

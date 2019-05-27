@@ -136,21 +136,15 @@ typedef struct {
 
     uint8_t                   	auto_connect_enable;    // 是否开启自动重连
 
-#ifdef AUTH_WITH_NOTLS
     char						*device_secret;					// 预置密钥
     int						    device_secret_len;			    // 预置密钥长度
-#endif
-
 } MQTTConnectParams;
 
 /**
  * MQTT连接参数结构体默认值定义
  */
-#ifdef AUTH_WITH_NOTLS
 #define DEFAULT_MQTTCONNECT_PARAMS { NULL, NULL, NULL, {0}, {'M', 'Q', 'T', 'C'}, 0, 4, 240, 1, 1, NULL}
-#else
-#define DEFAULT_MQTTCONNECT_PARAMS { NULL, NULL, NULL, {0}, {'M', 'Q', 'T', 'C'}, 0, 4, 240, 1, 1}
-#endif
+
 
 /**
  * @brief 订阅主题对应的消息处理结构体定义

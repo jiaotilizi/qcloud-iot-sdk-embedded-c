@@ -26,7 +26,6 @@ static int _utils_net_connected(Network *pNetwork) {
     return pNetwork->handle;
 }
 
-#ifndef AUTH_WITH_NOTLS
 /*** SSL connection ***/
 static int _read_tls(Network *pNetwork, unsigned char *data, size_t datalen, uint32_t timeout_ms, size_t *read_len)
 {
@@ -104,59 +103,32 @@ static int _connect_tcp(Network *pNetwork)
 }
 
 
-#else
-/*** TCP connection ***/
-static int _read_tcp(Network *pNetwork, unsigned char *data, size_t datalen, uint32_t timeout_ms, size_t *read_len)
-{
-	return HAL_TCP_Read(pNetwork->handle, data, (uint32_t)datalen, timeout_ms, read_len);
-}
-
-static int _write_tcp(Network *pNetwork, unsigned char *data, size_t datalen, uint32_t timeout_ms, size_t *written_len)
-{
-	return HAL_TCP_Write(pNetwork->handle, data, datalen, timeout_ms, written_len);
-}
-
-static int _disconnect_tcp(Network *pNetwork)
-{
-	POINTER_SANITY_CHECK(pNetwork, QCLOUD_ERR_INVAL);
-
-	if (0 == pNetwork->handle) {
-		return -1;
-	}
-
-	HAL_TCP_Disconnect(pNetwork->handle);
-	pNetwork->handle = 0;
-	return 0;
-}
-
-static int _connect_tcp(Network *pNetwork)
-{
-	POINTER_SANITY_CHECK(pNetwork, QCLOUD_ERR_INVAL);
-
-	pNetwork->handle = HAL_TCP_Connect(pNetwork->host, pNetwork->port);
-	if (0 == pNetwork->handle) {
-		return -1;
-	}
-	return 0;
-}
-#endif
-
 int utils_net_read(Network *pNetwork, unsigned char *data, size_t datalen, uint32_t timeout_ms, size_t *read_len)
 {
 	POINTER_SANITY_CHECK(pNetwork, QCLOUD_ERR_INVAL);
 
     int rc = 0;
-
-#ifndef AUTH_WITH_NOTLS
-	if(NULL != pNetwork->ssl_connect_params.ca_crt){
-		rc = _read_tls(pNetwork, data, datalen, timeout_ms, read_len);
-	}else{
-		rc = _read_tcp(pNetwork, data, datalen, timeout_ms, read_len);
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
+	
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		return QCLOUD_ERR_FAILURE;
 	}
 
-#else
-	rc = _read_tcp(pNetwork, data, datalen, timeout_ms, read_len);
-#endif
+	if ((AUTH_MODE_CERT_TLS == authmode) || (AUTH_MODE_KEY_TLS == authmode))
+	{
+		if(NULL != pNetwork->ssl_connect_params.ca_crt){
+			rc = _read_tls(pNetwork, data, datalen, timeout_ms, read_len);
+		}else{
+			rc = _read_tcp(pNetwork, data, datalen, timeout_ms, read_len);
+		}
+	}
+	else
+	{		
+		rc = _read_tcp(pNetwork, data, datalen, timeout_ms, read_len);
+	}
 
     return rc;
 }
@@ -166,17 +138,27 @@ int utils_net_write(Network *pNetwork, unsigned char *data, size_t datalen, uint
 	POINTER_SANITY_CHECK(pNetwork, QCLOUD_ERR_INVAL);
 
     int rc = 0;
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
 
-#ifndef AUTH_WITH_NOTLS	
-	if(NULL != pNetwork->ssl_connect_params.ca_crt){
-		rc = _write_tls(pNetwork, data, datalen, timeout_ms, written_len);
-	}else{
-		rc = _write_tcp(pNetwork, data, datalen, timeout_ms, written_len);
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		return QCLOUD_ERR_FAILURE;
 	}
 
-#else
-    rc = _write_tcp(pNetwork, data, datalen, timeout_ms, written_len);
-#endif
+	if ((AUTH_MODE_CERT_TLS == authmode) || (AUTH_MODE_KEY_TLS == authmode))
+	{
+		if(NULL != pNetwork->ssl_connect_params.ca_crt){
+			rc = _write_tls(pNetwork, data, datalen, timeout_ms, written_len);
+		}else{
+			rc = _write_tcp(pNetwork, data, datalen, timeout_ms, written_len);
+		}
+	}
+	else
+	{
+    	rc = _write_tcp(pNetwork, data, datalen, timeout_ms, written_len);
+	}
 
     return rc;
 }
@@ -185,16 +167,27 @@ void utils_net_disconnect(Network *pNetwork)
 {
 	POINTER_SANITY_CHECK_RTN(pNetwork);
 
-#ifndef AUTH_WITH_NOTLS
-	if(NULL != pNetwork->ssl_connect_params.ca_crt){
-		_disconnect_tls(pNetwork);
-	}else{
-		_disconnect_tcp(pNetwork);
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
+
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		return ;
 	}
 
-#else
-    _disconnect_tcp(pNetwork);
-#endif
+	if ((AUTH_MODE_CERT_TLS == authmode) || (AUTH_MODE_KEY_TLS == authmode))
+	{
+		if(NULL != pNetwork->ssl_connect_params.ca_crt){
+			_disconnect_tls(pNetwork);
+		}else{
+			_disconnect_tcp(pNetwork);
+		}
+	}
+	else
+	{
+    	_disconnect_tcp(pNetwork);
+	}
 }
 
 int utils_net_connect(Network *pNetwork)
@@ -202,18 +195,28 @@ int utils_net_connect(Network *pNetwork)
 	POINTER_SANITY_CHECK(pNetwork, QCLOUD_ERR_INVAL);
 
     int rc = 0;
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
 
-#ifndef AUTH_WITH_NOTLS
-	/*when tls enable, noTls also can be used*/
-	if(NULL != pNetwork->ssl_connect_params.ca_crt){
-		rc = _connect_tls(pNetwork);
-	}else{
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	if ((AUTH_MODE_CERT_TLS == authmode) || (AUTH_MODE_KEY_TLS == authmode))
+	{
+		/*when tls enable, noTls also can be used*/
+		if(NULL != pNetwork->ssl_connect_params.ca_crt){
+			rc = _connect_tls(pNetwork);
+		}else{
+			rc = _connect_tcp(pNetwork);
+		}
+	}
+	else
+	{
 		rc = _connect_tcp(pNetwork);
 	}
-	
-#else
-    rc = _connect_tcp(pNetwork);
-#endif
 
     return rc;
 }
@@ -239,7 +242,7 @@ static int _utils_udp_net_connected(Network *pNetwork) {
     return pNetwork->handle;
 }
 
-#ifndef AUTH_WITH_NOTLS
+
 static int _read_dtls(Network *pNetwork, unsigned char *data, size_t datalen, uint32_t timeout_ms, size_t *read_len)
 {
 	POINTER_SANITY_CHECK(pNetwork, QCLOUD_ERR_INVAL);
@@ -277,7 +280,7 @@ static int _connect_dtls(Network *pNetwork)
 
 	return ret;
 }
-#else
+
 static int _read_udp(Network *pNetwork, unsigned char *data, size_t datalen, uint32_t timeout_ms, size_t *read_len)
 {
 	POINTER_SANITY_CHECK(pNetwork, QCLOUD_ERR_INVAL);
@@ -324,20 +327,31 @@ static int _connect_udp(Network *pNetwork)
 	}
 	return 0;
 }
-#endif
+
 
 int utils_udp_net_read(Network *pNetwork, unsigned char *data, size_t datalen, uint32_t timeout_ms, size_t *read_len)
 {
 	POINTER_SANITY_CHECK(pNetwork, QCLOUD_ERR_INVAL);
 
 	int rc = 0;
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
 
-#ifndef AUTH_WITH_NOTLS
-	rc = _read_dtls(pNetwork, data, datalen, timeout_ms, read_len);
-#else
-    rc = _read_udp(pNetwork, data, datalen, timeout_ms, read_len);
-#endif
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		return QCLOUD_ERR_FAILURE;
+	}
 
+	if ((AUTH_MODE_CERT_TLS == authmode) || (AUTH_MODE_KEY_TLS == authmode))
+	{
+		rc = _read_dtls(pNetwork, data, datalen, timeout_ms, read_len);
+	}
+	else
+	{
+    	rc = _read_udp(pNetwork, data, datalen, timeout_ms, read_len);
+	}
+	
 	return rc;
 }
 
@@ -346,11 +360,23 @@ int utils_udp_net_write(Network *pNetwork, unsigned char *data, size_t datalen, 
 	POINTER_SANITY_CHECK(pNetwork, QCLOUD_ERR_INVAL);
 
 	int rc = 0;
-#ifndef AUTH_WITH_NOTLS
-	rc = _write_dtls(pNetwork, data, datalen, timeout_ms, written_len);
-#else
-    rc = _write_udp(pNetwork, data, datalen, timeout_ms, written_len);
-#endif
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
+
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		return QCLOUD_ERR_FAILURE;
+	}
+	
+	if ((AUTH_MODE_CERT_TLS == authmode) || (AUTH_MODE_KEY_TLS == authmode))
+	{
+		rc = _write_dtls(pNetwork, data, datalen, timeout_ms, written_len);
+	}
+	else
+	{
+    	rc = _write_udp(pNetwork, data, datalen, timeout_ms, written_len);
+	}
 
 	return rc;
 }
@@ -358,11 +384,23 @@ int utils_udp_net_write(Network *pNetwork, unsigned char *data, size_t datalen, 
 void utils_udp_net_disconnect(Network *pNetwork)
 {
 	POINTER_SANITY_CHECK_RTN(pNetwork);
-#ifndef AUTH_WITH_NOTLS
-	_disconnect_dtls(pNetwork);
-#else
-    _disconnect_udp(pNetwork);
-#endif
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
+
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		return ;
+	}
+	
+	if ((AUTH_MODE_CERT_TLS == authmode) || (AUTH_MODE_KEY_TLS == authmode))
+	{
+		_disconnect_dtls(pNetwork);
+	}
+	else
+	{
+    	_disconnect_udp(pNetwork);
+	}
 }
 
 int utils_udp_net_connect(Network *pNetwork)
@@ -370,11 +408,23 @@ int utils_udp_net_connect(Network *pNetwork)
 	POINTER_SANITY_CHECK(pNetwork, QCLOUD_ERR_INVAL);
 
 	int rc = 0;
-#ifndef AUTH_WITH_NOTLS
-	rc = _connect_dtls(pNetwork);
-#else
-    rc = _connect_udp(pNetwork);
-#endif
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
+
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		return QCLOUD_ERR_FAILURE;
+	}
+	
+	if ((AUTH_MODE_CERT_TLS == authmode) || (AUTH_MODE_KEY_TLS == authmode))
+	{
+		rc = _connect_dtls(pNetwork);
+	}
+	else
+	{
+    	rc = _connect_udp(pNetwork);
+	}
 
 	return rc;
 }

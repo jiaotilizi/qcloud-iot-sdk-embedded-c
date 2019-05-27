@@ -736,16 +736,28 @@ static int _http_client_recv_response(HTTPClient *client, uint32_t timeout_ms, H
 static int _http_network_init(Network *pNetwork, const char *host, int port, const char *ca_crt_dir)
 {
     int rc = QCLOUD_ERR_SUCCESS;
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
+	
     if (pNetwork == NULL) {
         return QCLOUD_ERR_INVAL;
     }
-#ifndef AUTH_WITH_NOTLS
-    if (ca_crt_dir != NULL) {
-        pNetwork->ssl_connect_params.ca_crt = ca_crt_dir;
-        pNetwork->ssl_connect_params.ca_crt_len = strlen(pNetwork->ssl_connect_params.ca_crt);
-        pNetwork->ssl_connect_params.timeout_ms = 10000;
-    }
-#endif
+
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		return QCLOUD_ERR_FAILURE;
+	}
+	
+	if ((AUTH_MODE_CERT_TLS == authmode) || (AUTH_MODE_KEY_TLS == authmode))
+	{
+	    if (ca_crt_dir != NULL) {
+	        pNetwork->ssl_connect_params.ca_crt = ca_crt_dir;
+	        pNetwork->ssl_connect_params.ca_crt_len = strlen(pNetwork->ssl_connect_params.ca_crt);
+	        pNetwork->ssl_connect_params.timeout_ms = 10000;
+	    }
+	}
+
     pNetwork->host = host;
     pNetwork->port = port;
 

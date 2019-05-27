@@ -390,14 +390,17 @@ static int _post_reg_request_by_http(char *request_buf, DeviceInfo *pDevInfo)
 	}
 
 	/*format URL*/
-#ifndef AUTH_WITH_NOTLS
-	HAL_Snprintf(url, REG_URL_MAX_LEN, url_format, "https", DYN_REG_SERVER_URL);
-	port = DYN_REG_SERVER_PORT_TLS;
-	ca_crt = iot_ca_get();
-#else
-	HAL_Snprintf(url, REG_URL_MAX_LEN, url_format, "http", DYN_REG_SERVER_URL);
-	port = DYN_REG_SERVER_PORT;
-#endif
+	if ((AUTH_MODE_CERT_TLS == authmode) || (AUTH_MODE_KEY_TLS == authmode))
+	{
+		HAL_Snprintf(url, REG_URL_MAX_LEN, url_format, "https", DYN_REG_SERVER_URL);
+		port = DYN_REG_SERVER_PORT_TLS;
+		ca_crt = iot_ca_get();
+	}
+	else /* AUTH_MODE_KEY_NO_TLS */
+	{
+		HAL_Snprintf(url, REG_URL_MAX_LEN, url_format, "http", DYN_REG_SERVER_URL);
+		port = DYN_REG_SERVER_PORT;
+	}
 
 	
 	memset((char *)&http_client, 0, sizeof(HTTPClient));  

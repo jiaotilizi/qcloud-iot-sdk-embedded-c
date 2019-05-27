@@ -50,9 +50,7 @@ struct Network {
 
     uintptr_t handle;   // 连接句柄:0，尚未连接; 非0，已经连接
 
-#ifndef AUTH_WITH_NOTLS
-    SSLConnectParams ssl_connect_params;
-#endif
+    SSLConnectParams ssl_connect_params; 	// 需要tls加密时生效
 
     const char       *host;                 // 服务器地址
     int              port;                  // 服务器端口

@@ -80,6 +80,14 @@ static void _copy_connect_params(MQTTConnectParams *destination, MQTTConnectPara
 
 	POINTER_SANITY_CHECK_RTN(destination);
 	POINTER_SANITY_CHECK_RTN(source);
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
+
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		return ;
+	}
 
     destination->mqtt_version = source->mqtt_version;
     destination->client_id = source->client_id;
@@ -87,10 +95,11 @@ static void _copy_connect_params(MQTTConnectParams *destination, MQTTConnectPara
     destination->keep_alive_interval = source->keep_alive_interval;
     destination->clean_session = source->clean_session;
     destination->auto_connect_enable = source->auto_connect_enable;
-#ifdef AUTH_WITH_NOTLS
-    destination->device_secret = source->device_secret;
-    destination->device_secret_len = source->device_secret_len;
-#endif
+	if ((AUTH_MODE_CERT_TLS != authmode) && (AUTH_MODE_KEY_TLS != authmode))
+	{
+    	destination->device_secret = source->device_secret;
+    	destination->device_secret_len = source->device_secret_len;
+	}
 }
 
 /**
@@ -114,6 +123,7 @@ static int _serialize_connect_packet(unsigned char *buf, size_t buf_len, MQTTCon
     unsigned char flags = 0;
     uint32_t rem_len = 0;
     int rc;
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
 
     long cur_timesec = HAL_Timer_current_sec() + MAX_ACCESS_EXPIRE_TIMEOUT / 1000;
     if (cur_timesec <= 0 || MAX_ACCESS_EXPIRE_TIMEOUT <= 0) {
@@ -131,15 +141,23 @@ static int _serialize_connect_packet(unsigned char *buf, size_t buf_len, MQTTCon
     get_next_conn_id(options->conn_id);
 	HAL_Snprintf(options->username, username_len, "%s;%s;%s;%ld", options->client_id, QCLOUD_IOT_DEVICE_SDK_APPID, options->conn_id, cur_timesec);
 
-#if defined(AUTH_WITH_NOTLS) && defined(AUTH_MODE_KEY)
-     if (options->device_secret != NULL && options->username != NULL) {
-    	 char                sign[41]   = {0};
-    	 utils_hmac_sha1(options->username, strlen(options->username), sign, options->device_secret, options->device_secret_len);
-    	 options->password = (char*) HAL_Malloc (51);
-    	 if (options->password == NULL) IOT_FUNC_EXIT_RC(QCLOUD_ERR_INVAL);
-		 HAL_Snprintf(options->password, 51, "%s;hmacsha1", sign);
-     }
-#endif
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		IOT_FUNC_EXIT_RC(QCLOUD_ERR_FAILURE);
+	}
+
+	if (AUTH_MODE_KEY_NO_TLS == authmode)
+	{
+	     if (options->device_secret != NULL && options->username != NULL) {
+	    	 char                sign[41]   = {0};
+	    	 utils_hmac_sha1(options->username, strlen(options->username), sign, options->device_secret, options->device_secret_len);
+	    	 options->password = (char*) HAL_Malloc (51);
+	    	 if (options->password == NULL) IOT_FUNC_EXIT_RC(QCLOUD_ERR_INVAL);
+			 HAL_Snprintf(options->password, 51, "%s;hmacsha1", sign);
+	     }
+	}
 
     rem_len = _get_packet_connect_rem_len(options);
     if (get_mqtt_packet_len(rem_len) > buf_len) {
@@ -171,9 +189,10 @@ static int _serialize_connect_packet(unsigned char *buf, size_t buf_len, MQTTCon
     flags |= (options->clean_session) ? MQTT_CONNECT_FLAG_CLEAN_SES : 0;
     flags |= (options->username != NULL) ? MQTT_CONNECT_FLAG_USERNAME : 0;
 
-#if defined(AUTH_WITH_NOTLS) && defined(AUTH_MODE_KEY)
-	flags |= MQTT_CONNECT_FLAG_PASSWORD;
-#endif
+	if (AUTH_MODE_KEY_NO_TLS == authmode)
+	{
+		flags |= MQTT_CONNECT_FLAG_PASSWORD;
+	}
     
     mqtt_write_char(&ptr, flags);
 
