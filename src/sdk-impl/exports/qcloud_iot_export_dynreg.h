@@ -32,13 +32,13 @@ extern "C" {
 #define  DYN_REG_RES_HTTP_TIMEOUT_MS  (2000)
 #define  FILE_PATH_MAX_LEN			(128)
 
-#ifdef AUTH_MODE_CERT
-#define  DYN_RESPONSE_BUFF_LEN	 	(5*1024)
-#define  DECODE_BUFF_LEN			(5*1024)
-#else
-#define  DYN_RESPONSE_BUFF_LEN	 	(256)
-#define  DECODE_BUFF_LEN			(256)
-#endif
+/* 证书认证 */
+#define  DYN_RESPONSE_BUFF_LEN_FOR_CERT	 	(5*1024)
+#define  DECODE_BUFF_LEN_FOR_CERT			(5*1024)
+/* 密钥认证 */
+#define  DYN_RESPONSE_BUFF_LEN_FOR_KEY	 	(256)
+#define  DECODE_BUFF_LEN_FOR_KEY			(256)
+
 
 
 

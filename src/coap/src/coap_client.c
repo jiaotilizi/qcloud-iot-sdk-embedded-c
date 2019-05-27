@@ -39,10 +39,9 @@ static char s_qcloud_iot_host[HOST_STR_LENGTH] = {0};
 static int s_qcloud_iot_port = 5684;
 
 #ifndef AUTH_WITH_NOTLS
-#ifndef AUTH_MODE_CERT
+// AUTH_MODE_KEY_TLS
 #define DECODE_PSK_LENGTH 48		/*控制台允许的最大长度为64，对应到原文最大长度64/4*3 = 48*/
 static unsigned char sg_psk_str[DECODE_PSK_LENGTH];
-#endif
 #endif
 
 static uint16_t _get_random_start_packet_id(void)
@@ -254,9 +253,8 @@ int   IOT_COAP_GetMessageCode(void *pMessage) {
 }
 
 int qcloud_iot_coap_init(CoAPClient *pClient, CoAPInitParams *pParams) {
-	DeviceAuthMode authmode = AUTH_MODE_MAX;
-	
     IOT_FUNC_ENTRY;
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
 
     POINTER_SANITY_CHECK(pClient, QCLOUD_ERR_INVAL);
     POINTER_SANITY_CHECK(pParams, QCLOUD_ERR_INVAL);
@@ -276,6 +274,7 @@ int qcloud_iot_coap_init(CoAPClient *pClient, CoAPInitParams *pParams) {
     	pParams->command_timeout = MAX_COMMAND_TIMEOUT;
     pClient->command_timeout_ms = pParams->command_timeout;
 
+	/* 获取鉴权模式 */
 	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
 	{
 		Log_e("get auth mode error!");
@@ -297,6 +296,8 @@ int qcloud_iot_coap_init(CoAPClient *pClient, CoAPInitParams *pParams) {
 		pClient->network_stack.ssl_connect_params.key_file = pParams->key_file;
 	    pClient->network_stack.ssl_connect_params.ca_crt = iot_ca_get();
 	    pClient->network_stack.ssl_connect_params.ca_crt_len = strlen(pClient->network_stack.ssl_connect_params.ca_crt);
+		pClient->network_stack.host = s_qcloud_iot_host;
+    	pClient->network_stack.port = s_qcloud_iot_port;
 	}
 	else if (AUTH_MODE_KEY_TLS == authmode)
 	{
@@ -314,9 +315,14 @@ int qcloud_iot_coap_init(CoAPClient *pClient, CoAPInitParams *pParams) {
 	        Log_e("psk is empty!");
 	        IOT_FUNC_EXIT_RC(QCLOUD_ERR_INVAL);
 	    }
+		pClient->network_stack.host = s_qcloud_iot_host;
+    	pClient->network_stack.port = s_qcloud_iot_port;
 	}
-    pClient->network_stack.host = s_qcloud_iot_host;
-    pClient->network_stack.port = s_qcloud_iot_port;
+	else /* AUTH_MODE_KEY_NO_TLS == authmode */
+	{
+		pClient->network_stack.host = s_qcloud_iot_host;
+    	pClient->network_stack.port = s_qcloud_iot_port;
+	}
 
     pClient->auth_token = NULL;
     pClient->auth_token_len = 0;

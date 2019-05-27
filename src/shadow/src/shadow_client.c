@@ -93,15 +93,27 @@ static void _shadow_event_handler(void *pclient, void *context, MQTTEventMsg *ms
 
 static void _copy_shadow_init_params_to_mqtt(MQTTInitParams *pMqttInitParams, ShadowInitParams *shadowInitParams)
 {
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
+
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		return ;
+	}
+	
 	pMqttInitParams->device_name = shadowInitParams->device_name;
     pMqttInitParams->product_id = shadowInitParams->product_id;
 
-#ifdef AUTH_MODE_CERT
-	pMqttInitParams->cert_file = shadowInitParams->cert_file;
-	pMqttInitParams->key_file = shadowInitParams->key_file;
-#else
-	pMqttInitParams->device_secret = shadowInitParams->device_secret;
-#endif
+	if (AUTH_MODE_CERT_TLS == authmode)
+	{ 
+		pMqttInitParams->cert_file = shadowInitParams->cert_file;
+		pMqttInitParams->key_file = shadowInitParams->key_file;
+	}
+	else
+	{
+		pMqttInitParams->device_secret = shadowInitParams->device_secret;
+	}
+
 
 	pMqttInitParams->command_timeout = shadowInitParams->command_timeout;
     pMqttInitParams->keep_alive_interval_ms = shadowInitParams->keep_alive_interval_ms;

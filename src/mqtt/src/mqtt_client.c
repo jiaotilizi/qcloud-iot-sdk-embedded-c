@@ -43,10 +43,9 @@ static int s_qcloud_iot_port = 1883;
 static int s_qcloud_iot_port = 8883;
 #endif
 
-#ifndef AUTH_MODE_CERT
+// AUTH_MODE_KEY_TLS
 #define DECODE_PSK_LENGTH 48		/*控制台允许的最大长度为64，对应到原文最大长度64/4*3 = 48*/
 static unsigned char sg_psk_str[DECODE_PSK_LENGTH];
-#endif
 
 
 
@@ -209,6 +208,7 @@ bool IOT_MQTT_IsConnected(void *pClient) {
 
 int qcloud_iot_mqtt_init(Qcloud_IoT_Client *pClient, MQTTInitParams *pParams) {
     IOT_FUNC_ENTRY;
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
 
     POINTER_SANITY_CHECK(pClient, QCLOUD_ERR_INVAL);
     POINTER_SANITY_CHECK(pParams, QCLOUD_ERR_INVAL);
@@ -276,50 +276,60 @@ int qcloud_iot_mqtt_init(Qcloud_IoT_Client *pClient, MQTTInitParams *pParams) {
     }
 	pClient->list_sub_wait_ack->free = HAL_Free;
 
-#ifndef AUTH_WITH_NOTLS
-    // TLS连接参数初始化
-#ifdef AUTH_MODE_CERT
-    bool certEmpty = (pParams->cert_file == NULL || pParams->key_file == NULL);
-    if (certEmpty) {
-        Log_e("cert file or key file is empty!");
-        IOT_FUNC_EXIT_RC(QCLOUD_ERR_INVAL);
-    }
-    Log_d("cert file: %s", pParams->cert_file);
-    Log_d("key file: %s", pParams->key_file);
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		IOT_FUNC_EXIT_RC(QCLOUD_ERR_FAILURE);
+	}
 
-    pClient->network_stack.ssl_connect_params.cert_file = pParams->cert_file;
-    pClient->network_stack.ssl_connect_params.key_file = pParams->key_file;
-    pClient->network_stack.ssl_connect_params.ca_crt = iot_ca_get();
-    pClient->network_stack.ssl_connect_params.ca_crt_len = strlen(pClient->network_stack.ssl_connect_params.ca_crt);
-#else
-    if (pParams->device_secret != NULL) {
-        size_t src_len = strlen(pParams->device_secret);
-        size_t len;
-        memset(sg_psk_str, 0x00, DECODE_PSK_LENGTH);
-        qcloud_iot_utils_base64decode(sg_psk_str, sizeof( sg_psk_str ), &len, (unsigned char *)pParams->device_secret, src_len );
-        pClient->network_stack.ssl_connect_params.psk = (char *)sg_psk_str;
-        pClient->network_stack.ssl_connect_params.psk_length = len;
-    } else {
-        Log_e("psk is empty!");
-        IOT_FUNC_EXIT_RC(QCLOUD_ERR_INVAL);
-    }
-    pClient->network_stack.ssl_connect_params.psk_id = iot_device_info_get()->client_id;
-    if (iot_device_info_get()->client_id == NULL) {
-        Log_e("psk id is empty!");
-        IOT_FUNC_EXIT_RC(QCLOUD_ERR_INVAL);
-    }
-    pClient->network_stack.ssl_connect_params.ca_crt = iot_ca_get();
-    pClient->network_stack.ssl_connect_params.ca_crt_len = strlen(pClient->network_stack.ssl_connect_params.ca_crt);
-#endif
+	if (AUTH_MODE_CERT_TLS == authmode)
+	{
+	    bool certEmpty = (pParams->cert_file == NULL || pParams->key_file == NULL);
+	    if (certEmpty) {
+	        Log_e("cert file or key file is empty!");
+	        IOT_FUNC_EXIT_RC(QCLOUD_ERR_INVAL);
+	    }
+	    Log_d("cert file: %s", pParams->cert_file);
+	    Log_d("key file: %s", pParams->key_file);
 
-    pClient->network_stack.host = s_qcloud_iot_host;
-    pClient->network_stack.port = s_qcloud_iot_port;
-    pClient->network_stack.ssl_connect_params.timeout_ms = QCLOUD_IOT_TLS_HANDSHAKE_TIMEOUT;
-
-#else
-    pClient->network_stack.host = s_qcloud_iot_host;
-    pClient->network_stack.port = s_qcloud_iot_port;
-#endif
+	    pClient->network_stack.ssl_connect_params.cert_file = pParams->cert_file;
+	    pClient->network_stack.ssl_connect_params.key_file = pParams->key_file;
+	    pClient->network_stack.ssl_connect_params.ca_crt = iot_ca_get();
+	    pClient->network_stack.ssl_connect_params.ca_crt_len = strlen(pClient->network_stack.ssl_connect_params.ca_crt);
+		pClient->network_stack.ssl_connect_params.timeout_ms = QCLOUD_IOT_TLS_HANDSHAKE_TIMEOUT;
+		pClient->network_stack.host = s_qcloud_iot_host;
+    	pClient->network_stack.port = s_qcloud_iot_port;
+	}
+	else if (AUTH_MODE_KEY_TLS == authmode)
+	{
+	    if (pParams->device_secret != NULL) {
+	        size_t src_len = strlen(pParams->device_secret);
+	        size_t len;
+	        memset(sg_psk_str, 0x00, DECODE_PSK_LENGTH);
+	        qcloud_iot_utils_base64decode(sg_psk_str, sizeof( sg_psk_str ), &len, (unsigned char *)pParams->device_secret, src_len );
+	        pClient->network_stack.ssl_connect_params.psk = (char *)sg_psk_str;
+	        pClient->network_stack.ssl_connect_params.psk_length = len;
+	    } else {
+	        Log_e("psk is empty!");
+	        IOT_FUNC_EXIT_RC(QCLOUD_ERR_INVAL);
+	    }
+	    pClient->network_stack.ssl_connect_params.psk_id = iot_device_info_get()->client_id;
+	    if (iot_device_info_get()->client_id == NULL) {
+	        Log_e("psk id is empty!");
+	        IOT_FUNC_EXIT_RC(QCLOUD_ERR_INVAL);
+	    }
+	    pClient->network_stack.ssl_connect_params.ca_crt = iot_ca_get();
+	    pClient->network_stack.ssl_connect_params.ca_crt_len = strlen(pClient->network_stack.ssl_connect_params.ca_crt);
+		pClient->network_stack.ssl_connect_params.timeout_ms = QCLOUD_IOT_TLS_HANDSHAKE_TIMEOUT;
+		pClient->network_stack.host = s_qcloud_iot_host;
+    	pClient->network_stack.port = s_qcloud_iot_port;
+	}
+	else /* AUTH_MODE_KEY_NO_TLS == authmode */
+	{
+		pClient->network_stack.host = s_qcloud_iot_host;
+    	pClient->network_stack.port = s_qcloud_iot_port;
+	}
 
     // 底层网络操作相关的数据结构初始化
     qcloud_iot_mqtt_network_init(&(pClient->network_stack));

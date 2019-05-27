@@ -34,9 +34,7 @@ extern "C" {
 
 #include "utils_timer.h"
 
-#ifndef AUTH_MODE_CERT
 static const int ciphersuites[] = { MBEDTLS_TLS_PSK_WITH_AES_128_CBC_SHA, MBEDTLS_TLS_PSK_WITH_AES_256_CBC_SHA, 0 };
-#endif
     
 /**
  * @brief 用于保存SSL连接相关数据结构
@@ -83,6 +81,7 @@ static void _free_mebedtls(TLSDataParams *pParams)
 static int _mbedtls_client_init(TLSDataParams *pDataParams, TLSConnectParams *pConnectParams) {
 
     int ret = QCLOUD_ERR_SUCCESS;
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
     mbedtls_net_init(&(pDataParams->socket_fd));
     mbedtls_ssl_init(&(pDataParams->ssl));
     mbedtls_ssl_config_init(&(pDataParams->ssl_conf));
@@ -108,34 +107,44 @@ static int _mbedtls_client_init(TLSDataParams *pDataParams, TLSConnectParams *pC
         }
     }
 
-#ifdef AUTH_MODE_CERT
-    if (pConnectParams->cert_file != NULL && pConnectParams->key_file != NULL) {
-            if ((ret = mbedtls_x509_crt_parse_file(&(pDataParams->client_cert), pConnectParams->cert_file)) != 0) {
-            Log_e("load client cert file failed returned 0x%x", ret<0?-ret:ret);
-            return QCLOUD_ERR_SSL_CERT;
-        }
-
-        if ((ret = mbedtls_pk_parse_keyfile(&(pDataParams->private_key), pConnectParams->key_file, "")) != 0) {
-            Log_e("load client key file failed returned 0x%x", ret<0?-ret:ret);
-            return QCLOUD_ERR_SSL_CERT;
-        }
-    } else {
-        Log_d("cert_file/key_file is empty!|cert_file=%s|key_file=%s", pConnectParams->cert_file, pConnectParams->key_file);
-    }
-#else
-	if (pConnectParams->psk != NULL && pConnectParams->psk_id !=NULL) {
-        const char *psk_id = pConnectParams->psk_id;
-        ret = mbedtls_ssl_conf_psk(&(pDataParams->ssl_conf), (unsigned char *)pConnectParams->psk, pConnectParams->psk_length,
-                                    (const unsigned char *) psk_id, strlen( psk_id ));
-    } else {
-        Log_d("psk/pskid is empty!|psk=%s|psd_id=%s", pConnectParams->psk, pConnectParams->psk_id);
-    }
-	
-	if (0 != ret) {
-		Log_e("mbedtls_ssl_conf_psk fail: 0x%x", ret<0?-ret:ret);
-		return ret;
+	/* 获取鉴权模式 */
+	if (0 != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		ret = QCLOUD_ERR_SSL_CERT;
 	}
-#endif
+
+	if (AUTH_MODE_CERT_TLS == authmode)
+	{
+	    if (pConnectParams->cert_file != NULL && pConnectParams->key_file != NULL) {
+	            if ((ret = mbedtls_x509_crt_parse_file(&(pDataParams->client_cert), pConnectParams->cert_file)) != 0) {
+	            Log_e("load client cert file failed returned 0x%x", ret<0?-ret:ret);
+	            return QCLOUD_ERR_SSL_CERT;
+	        }
+
+	        if ((ret = mbedtls_pk_parse_keyfile(&(pDataParams->private_key), pConnectParams->key_file, "")) != 0) {
+	            Log_e("load client key file failed returned 0x%x", ret<0?-ret:ret);
+	            return QCLOUD_ERR_SSL_CERT;
+	        }
+	    } else {
+	        Log_d("cert_file/key_file is empty!|cert_file=%s|key_file=%s", pConnectParams->cert_file, pConnectParams->key_file);
+	    }
+	}
+	else
+	{
+		if (pConnectParams->psk != NULL && pConnectParams->psk_id !=NULL) {
+	        const char *psk_id = pConnectParams->psk_id;
+	        ret = mbedtls_ssl_conf_psk(&(pDataParams->ssl_conf), (unsigned char *)pConnectParams->psk, pConnectParams->psk_length,
+	                                    (const unsigned char *) psk_id, strlen( psk_id ));
+	    } else {
+	        Log_d("psk/pskid is empty!|psk=%s|psd_id=%s", pConnectParams->psk, pConnectParams->psk_id);
+	    }
+		
+		if (0 != ret) {
+			Log_e("mbedtls_ssl_conf_psk fail: 0x%x", ret<0?-ret:ret);
+			return ret;
+		}
+	}
 
     return QCLOUD_ERR_SUCCESS;
 }
@@ -194,6 +203,7 @@ int _qcloud_server_certificate_verify(void *hostname, mbedtls_x509_crt *crt, int
 uintptr_t HAL_TLS_Connect(TLSConnectParams *pConnectParams, const char *host, int port)
 {
     int ret = 0;
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
 
     TLSDataParams * pDataParams = (TLSDataParams *)HAL_Malloc(sizeof(TLSDataParams));
     
@@ -232,12 +242,20 @@ uintptr_t HAL_TLS_Connect(TLSConnectParams *pConnectParams, const char *host, in
         goto error;
     }
 
-#ifndef AUTH_MODE_CERT
-    // 选择加密套件代码，以后不通加密方式合并端口的时候可以用到
-    if(pConnectParams->psk != NULL) {
-        mbedtls_ssl_conf_ciphersuites(&(pDataParams->ssl_conf), ciphersuites);
-    }
-#endif
+	/* 获取鉴权模式 */
+	if (0 != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("mbedtls_ssl_setup get auth mode error!");
+		goto error;
+	}
+
+	if (AUTH_MODE_CERT_TLS != authmode)
+	{
+	    // 选择加密套件代码，以后不通加密方式合并端口的时候可以用到
+	    if(pConnectParams->psk != NULL) {
+	        mbedtls_ssl_conf_ciphersuites(&(pDataParams->ssl_conf), ciphersuites);
+	    }
+	}
 
     // Set the hostname to check against the received server certificate and sni
     if ((ret = mbedtls_ssl_set_hostname(&(pDataParams->ssl), host)) != 0) {

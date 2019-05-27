@@ -40,9 +40,7 @@ extern "C" {
     
 #define DEBUG_LEVEL 0
     
-#ifndef AUTH_MODE_CERT
 static const int ciphersuites[] = { MBEDTLS_TLS_PSK_WITH_AES_128_CBC_SHA, MBEDTLS_TLS_PSK_WITH_AES_256_CBC_SHA, 0 };
-#endif
 
     
 typedef struct
@@ -88,6 +86,7 @@ static void _dtls_debug( void *ctx, int level,
 static int _mbedtls_client_init(DTLSDataParams *pDataParams, DTLSConnectParams *pConnectParams)
 {
 	int ret = QCLOUD_ERR_SUCCESS;
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
 
 #if defined(MBEDTLS_DEBUG_C)
     mbedtls_debug_set_threshold( DEBUG_LEVEL );
@@ -120,43 +119,52 @@ static int _mbedtls_client_init(DTLSDataParams *pDataParams, DTLSConnectParams *
         }
     }
 
-#ifdef AUTH_MODE_CERT
-    if (pConnectParams->cert_file != NULL && pConnectParams->key_file != NULL) {
-            if ((ret = mbedtls_x509_crt_parse_file(&(pDataParams->client_cert), pConnectParams->cert_file)) != 0) {
-            Log_e("load client cert file failed returned -0x%x", ret);
-            return QCLOUD_ERR_SSL_CERT;
-        }
-
-        if ((ret = mbedtls_pk_parse_keyfile(&(pDataParams->private_key), pConnectParams->key_file, "")) != 0) {
-            Log_e("load client key file failed returned -0x%x", ret);
-            return QCLOUD_ERR_SSL_CERT;
-        }
-
-        if (0 == ret) {
-            mbedtls_ssl_conf_ca_chain(&(pDataParams->ssl_conf), &(pDataParams->ca_cert), NULL);
-            if ((ret = mbedtls_ssl_conf_own_cert(&(pDataParams->ssl_conf), &(pDataParams->client_cert), &(pDataParams->private_key))) != 0) {
-                Log_e("mbedtls_ssl_conf_own_cert failed returned -0x%x", -ret);
-                return QCLOUD_ERR_SSL_CERT;
-            }
-        }
-    } else {
-        Log_d("cert_file/key_file is empty!|cert_file=%s|key_file=%s", pConnectParams->cert_file, pConnectParams->key_file);
-    }
-    
-#else
-    if (pConnectParams->psk != NULL && pConnectParams->psk_id !=NULL) {
-        const char *psk_id = pConnectParams->psk_id;
-        ret = mbedtls_ssl_conf_psk(&(pDataParams->ssl_conf), (unsigned char *)pConnectParams->psk, pConnectParams->psk_length,
-                                    (const unsigned char *) psk_id, strlen( psk_id ));
-    } else {
-        Log_d("psk/pskid is empty!|psk=%s|psd_id=%s", pConnectParams->psk, pConnectParams->psk_id);
-    }
-	
-	if (0 != ret) {
-		Log_e("mbedtls_ssl_conf_psk fail: -0x%x", -ret);
-		return ret;
+	/* 获取鉴权模式 */
+	if (0 != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		ret = QCLOUD_ERR_SSL_CERT;
 	}
-#endif
+
+	if (AUTH_MODE_CERT_TLS == authmode)
+	{
+	    if (pConnectParams->cert_file != NULL && pConnectParams->key_file != NULL) {
+	            if ((ret = mbedtls_x509_crt_parse_file(&(pDataParams->client_cert), pConnectParams->cert_file)) != 0) {
+	            Log_e("load client cert file failed returned -0x%x", ret);
+	            return QCLOUD_ERR_SSL_CERT;
+	        }
+
+	        if ((ret = mbedtls_pk_parse_keyfile(&(pDataParams->private_key), pConnectParams->key_file, "")) != 0) {
+	            Log_e("load client key file failed returned -0x%x", ret);
+	            return QCLOUD_ERR_SSL_CERT;
+	        }
+
+	        if (0 == ret) {
+	            mbedtls_ssl_conf_ca_chain(&(pDataParams->ssl_conf), &(pDataParams->ca_cert), NULL);
+	            if ((ret = mbedtls_ssl_conf_own_cert(&(pDataParams->ssl_conf), &(pDataParams->client_cert), &(pDataParams->private_key))) != 0) {
+	                Log_e("mbedtls_ssl_conf_own_cert failed returned -0x%x", -ret);
+	                return QCLOUD_ERR_SSL_CERT;
+	            }
+	        }
+	    } else {
+	        Log_d("cert_file/key_file is empty!|cert_file=%s|key_file=%s", pConnectParams->cert_file, pConnectParams->key_file);
+	    }
+	}
+    else
+	{
+	    if (pConnectParams->psk != NULL && pConnectParams->psk_id !=NULL) {
+	        const char *psk_id = pConnectParams->psk_id;
+	        ret = mbedtls_ssl_conf_psk(&(pDataParams->ssl_conf), (unsigned char *)pConnectParams->psk, pConnectParams->psk_length,
+	                                    (const unsigned char *) psk_id, strlen( psk_id ));
+	    } else {
+	        Log_d("psk/pskid is empty!|psk=%s|psd_id=%s", pConnectParams->psk, pConnectParams->psk_id);
+	    }
+		
+		if (0 != ret) {
+			Log_e("mbedtls_ssl_conf_psk fail: -0x%x", -ret);
+			return ret;
+		}
+	}
 
     return ret;
 }
@@ -198,6 +206,7 @@ uintptr_t HAL_DTLS_Connect(DTLSConnectParams *pConnectParams, const char *host, 
 	IOT_FUNC_ENTRY;
 
     int ret = QCLOUD_ERR_SUCCESS;
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
     
     DTLSDataParams * pDataParams = (DTLSDataParams *)HAL_Malloc(sizeof(DTLSDataParams));
 
@@ -227,9 +236,17 @@ uintptr_t HAL_DTLS_Connect(DTLSConnectParams *pConnectParams, const char *host, 
 
     mbedtls_ssl_conf_dtls_cookies(&pDataParams->ssl_conf, mbedtls_ssl_cookie_write, mbedtls_ssl_cookie_check, &pDataParams->cookie_ctx);
 
-#ifndef AUTH_MODE_CERT
-	mbedtls_ssl_conf_ciphersuites(&(pDataParams->ssl_conf), ciphersuites);
-#endif        
+	/* 获取鉴权模式 */
+	if (0 != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("mbedtls_ssl_setup get auth mode error!");
+		goto error;
+	}
+
+	if (AUTH_MODE_CERT_TLS != authmode)
+	{
+		mbedtls_ssl_conf_ciphersuites(&(pDataParams->ssl_conf), ciphersuites);
+	}    
     
 #ifdef MBEDTLS_SSL_PROTO_DTLS
     if (pDataParams->ssl_conf.transport == MBEDTLS_SSL_TRANSPORT_DATAGRAM)

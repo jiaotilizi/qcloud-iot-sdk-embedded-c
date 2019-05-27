@@ -203,7 +203,8 @@ static int _parse_devinfo(char *jdoc, DeviceInfo *pDevInfo)
 	int enType;
 	unsigned int keybits;	
 	char key[UTILS_AES_BLOCK_LEN + 1];
-	char decodeBuff[DECODE_BUFF_LEN] = {0};
+	char decodeBuff_cert[DECODE_BUFF_LEN_FOR_CERT] = {0};
+	char decodeBuff_key[DECODE_BUFF_LEN_FOR_KEY] = {0};
 	unsigned char iv[16];
 	char *payload = NULL;
 	
@@ -213,6 +214,14 @@ static int _parse_devinfo(char *jdoc, DeviceInfo *pDevInfo)
 	DeviceAuthMode authmode = AUTH_MODE_MAX;
 	
 	Log_d("recv：%s", jdoc);
+
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		ret = QCLOUD_ERR_FAILURE;
+		goto exit;
+	}
 
 	ret = _get_json_resault_code(jdoc);
 	if(QCLOUD_ERR_SUCCESS != ret){
@@ -228,21 +237,40 @@ static int _parse_devinfo(char *jdoc, DeviceInfo *pDevInfo)
 	}else{
 		Log_d("payload:%s", payload);
 	}
-		
-	ret = qcloud_iot_utils_base64decode((uint8_t *)decodeBuff, sizeof(decodeBuff), &len, (uint8_t *)payload, strlen(payload));
+
+	if (AUTH_MODE_CERT_TLS == authmode)
+	{
+		ret = qcloud_iot_utils_base64decode((uint8_t *)decodeBuff_cert, sizeof(decodeBuff_cert), &len, 
+											(uint8_t *)payload, strlen(payload));
+	}
+	else
+	{
+		ret = qcloud_iot_utils_base64decode((uint8_t *)decodeBuff_key, sizeof(decodeBuff_key), &len, 
+											(uint8_t *)payload, strlen(payload));
+	}
 	if (ret != QCLOUD_ERR_SUCCESS) {
 		Log_e("Response decode err, response:%s", payload);
 		ret = QCLOUD_ERR_FAILURE;
 		goto exit;
 	}
-	
+
 	datalen =  len + (UTILS_AES_BLOCK_LEN - len%UTILS_AES_BLOCK_LEN);
 	keybits = AES_KEY_BITS_128;
 	memset(key, 0, UTILS_AES_BLOCK_LEN);
 	strncpy(key, pDevInfo->product_key, UTILS_AES_BLOCK_LEN);
 	memset( iv , '0', UTILS_AES_BLOCK_LEN);	
-	ret = utils_aes_cbc((uint8_t *)decodeBuff, datalen, (uint8_t *)decodeBuff, 
-											DECODE_BUFF_LEN, UTILS_AES_DECRYPT, (uint8_t *)key, keybits, iv);
+	
+	if (AUTH_MODE_CERT_TLS == authmode)
+	{
+		ret = utils_aes_cbc((uint8_t *)decodeBuff_cert, datalen, (uint8_t *)decodeBuff_cert, 
+							DECODE_BUFF_LEN_FOR_CERT, UTILS_AES_DECRYPT, (uint8_t *)key, keybits, iv);
+	}
+	else
+	{
+		ret = utils_aes_cbc((uint8_t *)decodeBuff_key, datalen, (uint8_t *)decodeBuff_key, 
+							DECODE_BUFF_LEN_FOR_KEY, UTILS_AES_DECRYPT, (uint8_t *)key, keybits, iv);
+	}
+	
 	if(QCLOUD_ERR_SUCCESS == ret){
 		//Log_d("The decrypted data is:%s", decodeBuff);
 			
@@ -251,15 +279,16 @@ static int _parse_devinfo(char *jdoc, DeviceInfo *pDevInfo)
 		goto exit;
 	}
 
-	enType = _get_json_encry_type(decodeBuff);
+	if (AUTH_MODE_CERT_TLS == authmode)
+	{
+		enType = _get_json_encry_type(decodeBuff_cert);
+	}
+	else
+	{
+		enType = _get_json_encry_type(decodeBuff_key);
+	}
 	if(enType < 0){
 		Log_e("invlid encryt type, decrypt maybe faild");
-		ret = QCLOUD_ERR_FAILURE;
-		goto exit;
-	}
-
-	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
-	{
 		ret = QCLOUD_ERR_FAILURE;
 		goto exit;
 	}
@@ -272,7 +301,7 @@ static int _parse_devinfo(char *jdoc, DeviceInfo *pDevInfo)
 			goto exit;
 		}
 
-		clientCert = _get_json_cert_data(decodeBuff);
+		clientCert = _get_json_cert_data(decodeBuff_cert);
 		if(NULL != clientCert){
 			memset(pDevInfo->devCertFileName, 0, MAX_SIZE_OF_DEVICE_CERT_FILE_NAME);
 			HAL_Snprintf(pDevInfo->devCertFileName, MAX_SIZE_OF_DEVICE_CERT_FILE_NAME, "%s_cert.crt", pDevInfo->device_name);
@@ -288,7 +317,7 @@ static int _parse_devinfo(char *jdoc, DeviceInfo *pDevInfo)
 			ret = QCLOUD_ERR_FAILURE;
 		}
 
-		clientKey = _get_json_key_data(decodeBuff);
+		clientKey = _get_json_key_data(decodeBuff_cert);
 		if(NULL != clientKey){
 			memset(pDevInfo->devPrivateKeyFileName, 0, MAX_SIZE_OF_DEVICE_KEY_FILE_NAME);
 			HAL_Snprintf(pDevInfo->devPrivateKeyFileName, MAX_SIZE_OF_DEVICE_KEY_FILE_NAME, "%s_private.key", pDevInfo->device_name);
@@ -312,7 +341,7 @@ static int _parse_devinfo(char *jdoc, DeviceInfo *pDevInfo)
 			goto exit;
 		}
 
-		psk = _get_json_psk(decodeBuff);
+		psk = _get_json_psk(decodeBuff_key);
 		if(NULL != psk){
 			if(strlen(psk) > MAX_SIZE_OF_DEVICE_SERC){
 				Log_e("psk exceed max len,%s", psk);
@@ -349,7 +378,16 @@ static int _post_reg_request_by_http(char *request_buf, DeviceInfo *pDevInfo)
     char             url[REG_URL_MAX_LEN] = {0};
 	int 			 port;
 	const char 		 *ca_crt = NULL;
-	char 			 respbuff[DYN_RESPONSE_BUFF_LEN];
+	char 			 respbuff_cert[DYN_RESPONSE_BUFF_LEN_FOR_CERT];
+	char 			 respbuff_key[DYN_RESPONSE_BUFF_LEN_FOR_KEY];
+	DeviceAuthMode 	 authmode = AUTH_MODE_MAX;
+
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		return QCLOUD_ERR_FAILURE;;
+	}
 
 	/*format URL*/
 #ifndef AUTH_WITH_NOTLS
@@ -376,10 +414,19 @@ static int _post_reg_request_by_http(char *request_buf, DeviceInfo *pDevInfo)
         Log_e("qcloud_http_client_common failed, Ret = %d", Ret);
         return Ret;
     }
-	
-	memset(respbuff, 0, DYN_RESPONSE_BUFF_LEN);
-	http_data.response_buf_len = DYN_RESPONSE_BUFF_LEN;
-    http_data.response_buf = respbuff;
+
+	if (AUTH_MODE_CERT_TLS == authmode)
+	{
+		memset(respbuff_cert, 0, DYN_RESPONSE_BUFF_LEN_FOR_CERT);
+		http_data.response_buf_len = DYN_RESPONSE_BUFF_LEN_FOR_CERT;
+	    http_data.response_buf = respbuff_cert;
+	}
+	else
+	{
+		memset(respbuff_key, 0, DYN_RESPONSE_BUFF_LEN_FOR_KEY);
+		http_data.response_buf_len = DYN_RESPONSE_BUFF_LEN_FOR_KEY;
+	    http_data.response_buf = respbuff_key;
+	}
         
     Ret = qcloud_http_recv_data(&http_client, DYN_REG_RES_HTTP_TIMEOUT_MS, &http_data);
     if (QCLOUD_ERR_SUCCESS != Ret) {
@@ -437,6 +484,7 @@ int qcloud_iot_dyn_reg_dev(DeviceInfo *pDevInfo)
 	int len;
 	char sign[DYN_REG_SIGN_LEN] = {0};
 	char *pRequest = NULL;
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
 
 	if(strlen(pDevInfo->product_key) < UTILS_AES_BLOCK_LEN){
 		Log_e("product key inllegal");
@@ -468,7 +516,14 @@ int qcloud_iot_dyn_reg_dev(DeviceInfo *pDevInfo)
 	HAL_Snprintf(pRequest, len, para_format, pDevInfo->device_name, nonce, pDevInfo->product_id, timestamp, sign);
 	Log_d("request:%s",pRequest);
 
-	Log_d("resbuff len:%d", DYN_RESPONSE_BUFF_LEN);
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		return QCLOUD_ERR_FAILURE;;
+	}
+	
+	Log_d("resbuff len:%d", ((AUTH_MODE_CERT_TLS == authmode)? DYN_RESPONSE_BUFF_LEN_FOR_CERT : DYN_RESPONSE_BUFF_LEN_FOR_KEY));
 	/*post request*/
 	Ret =_post_reg_request_by_http(pRequest, pDevInfo);		
 	if(QCLOUD_ERR_SUCCESS == Ret){

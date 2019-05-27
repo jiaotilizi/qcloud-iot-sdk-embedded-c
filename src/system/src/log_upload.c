@@ -92,7 +92,7 @@ typedef struct {
 static LogUploaderStruct *sg_uploader;
 static bool sg_log_uploader_init_done = false;
 
-#ifdef AUTH_MODE_CERT
+
 static int _gen_key_from_file( const char *file_path)
 {
     FILE *fp;
@@ -130,7 +130,7 @@ static int _gen_key_from_file( const char *file_path)
 
     return 0;
 }
-#endif
+
 
 
 static long _get_system_time(void)
@@ -451,6 +451,7 @@ void clear_upload_buffer()
 void init_log_uploader(LogUploadInitParams *init_params)
 {
     int i;
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
 
     if (init_params == NULL || init_params->product_id == NULL || 
             init_params->device_name == NULL || init_params->sign_key == NULL) {
@@ -466,17 +467,26 @@ void init_log_uploader(LogUploadInitParams *init_params)
     
     for(i = 0; i<LOG_BUF_FIXED_HEADER_SIZE; i++)
         sg_log_buffer[i] = '#';
+
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		UPLOAD_ERR("get auth mode error!");
+		return ;
+	}
     
-#ifdef AUTH_MODE_CERT     
-    if (_gen_key_from_file(init_params->sign_key) != 0) {
-        UPLOAD_ERR("gen_key_from_file failed");        
-        return ;
-    }
-    sg_log_buffer[SIGNATURE_SIZE] = 'C';
-#else    
-    memcpy(sg_sign_key, init_params->sign_key, key_len>SIGN_KEY_SIZE?SIGN_KEY_SIZE:key_len);
-    sg_log_buffer[SIGNATURE_SIZE] = 'P';
-#endif    
+	if (AUTH_MODE_CERT_TLS == authmode)
+	{    
+	    if (_gen_key_from_file(init_params->sign_key) != 0) {
+	        UPLOAD_ERR("gen_key_from_file failed");        
+	        return ;
+	    }
+	    sg_log_buffer[SIGNATURE_SIZE] = 'C';
+	}
+	else
+	{
+    	memcpy(sg_sign_key, init_params->sign_key, key_len>SIGN_KEY_SIZE?SIGN_KEY_SIZE:key_len);
+    	sg_log_buffer[SIGNATURE_SIZE] = 'P';
+	}
 
     memcpy(sg_log_buffer+SIGNATURE_SIZE+CTRL_BYTES_SIZE, init_params->product_id, MAX_SIZE_OF_PRODUCT_ID);
     memcpy(sg_log_buffer+SIGNATURE_SIZE+CTRL_BYTES_SIZE+MAX_SIZE_OF_PRODUCT_ID, init_params->device_name, strlen(init_params->device_name));        
