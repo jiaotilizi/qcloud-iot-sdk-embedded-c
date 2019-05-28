@@ -26,10 +26,8 @@
 
 #define MAX_SIZE_OF_TOPIC_CONTENT 100
 
-#ifdef AUTH_MODE_CERT
-    static char sg_cert_file[PATH_MAX + 1];      //客户端证书全路径
-    static char sg_key_file[PATH_MAX + 1];       //客户端密钥全路径
-#endif
+static char sg_cert_file[PATH_MAX + 1];      //客户端证书全路径
+static char sg_key_file[PATH_MAX + 1];       //客户端密钥全路径
 
 //static DeviceInfo sg_devInfo;
 
@@ -108,53 +106,74 @@ static int _setup_connect_init_params(MQTTInitParams* initParams)
 	int ret;
 	DeviceInfo info_write;
 	DeviceInfo info_read;
-	
-	memset(&info_write, 0, sizeof(DeviceInfo));
-	memset(&info_read, 0, sizeof(DeviceInfo));
-	
-	sprintf(info_write.product_id, "%s", "LN19CSVR64");
-	sprintf(info_write.device_name, "%s", "door1");
-	sprintf(info_write.devSerc, "%s", "BhKEOITUbhtxU2z7rW+d0Q==");
-	
-	ret = IOT_Device_Info_Flash_Read(&info_read);
-	Log_i("###### IOT_Device_Info_Flash_Read ret = %d, info: %s/%s/%s", 
-			ret, info_read.product_id, info_read.device_name, info_read.devSerc);
-	
-	ret = IOT_Device_Info_Flash_Write(&info_write);
-	Log_i("###### IOT_Device_Info_Flash_Write ret = %d, info: %s/%s/%s", 
-			ret, info_write.product_id, info_write.device_name, info_write.devSerc);
-	
-	ret = IOT_Device_Info_Flash_Read(&info_read);
-	Log_i("###### IOT_Device_Info_Flash_Read ret = %d, info: %s/%s/%s", 
-			ret, info_read.product_id, info_read.device_name, info_read.devSerc);
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
 
-	initParams->product_id = info_read.product_id;
-	initParams->device_name = info_read.device_name;
-
-#ifdef AUTH_MODE_CERT
-	/* 使用非对称加密*/
-	char certs_dir[PATH_MAX + 1] = "certs";
-	char current_path[PATH_MAX + 1];
-	char *cwd = getcwd(current_path, sizeof(current_path));
-	if (cwd == NULL)
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
 	{
-		Log_e("getcwd return NULL");
+		Log_e("get auth mode error!");
 		return QCLOUD_ERR_FAILURE;
 	}
-	sprintf(sg_cert_file, "%s/%s/%s", current_path, certs_dir, sg_devInfo.devCertFileName);
-	sprintf(sg_key_file, "%s/%s/%s", current_path, certs_dir, sg_devInfo.devPrivateKeyFileName);
+	Log_i("###### get auth mode %d", authmode);
 
-	initParams->cert_file = sg_cert_file;
-	initParams->key_file = sg_key_file;
-#else
-    initParams->device_secret = info_read.devSerc;
-#endif
+	if (AUTH_MODE_CERT_TLS != authmode)
+	{
+		memset(&info_write, 0, sizeof(DeviceInfo));
+		memset(&info_read, 0, sizeof(DeviceInfo));
+		
+		sprintf(info_write.product_id, "%s", "LN19CSVR64");
+		sprintf(info_write.device_name, "%s", "door1");
+		sprintf(info_write.devSerc, "%s", "BhKEOITUbhtxU2z7rW+d0Q==");
+		
+		ret = IOT_Device_Info_Flash_Write(&info_write);
+		Log_i("###### IOT_Device_Info_Flash_Write ret = %d, info: %s/%s/%s", 
+				ret, info_write.product_id, info_write.device_name, info_write.devSerc);
+		
+		ret = IOT_Device_Info_Flash_Read(&info_read);
+		Log_i("###### IOT_Device_Info_Flash_Read ret = %d, info: %s/%s/%s", 
+				ret, info_read.product_id, info_read.device_name, info_read.devSerc);
 
-    
+		//initParams->product_id = info_read.product_id;	/* 值无法传出去 */
+		//initParams->device_name = info_read.device_name; 	/* 值无法传出去 */
+		initParams->product_id = "LN19CSVR64";
+		initParams->device_name = "door1";
+	}
+	else
+	{
+		initParams->product_id = "6SF5233CVA"; 	/* Door_Cert */
+		initParams->device_name = "door1";		/* Door_Cert */
+	}
+
+	if (AUTH_MODE_CERT_TLS == authmode)
+	{
+		/* 使用非对称加密*/
+		char certs_dir[PATH_MAX + 1] = "certs";
+		char current_path[PATH_MAX + 1];
+		char *cwd = getcwd(current_path, sizeof(current_path));
+		if (cwd == NULL)
+		{
+			Log_e("getcwd return NULL");
+			return QCLOUD_ERR_FAILURE;
+		}
+		sprintf(sg_cert_file, "%s/%s/%s", current_path, certs_dir, "door1_cert.crt");
+		sprintf(sg_key_file, "%s/%s/%s", current_path, certs_dir, "door1_private.key");
+
+		initParams->cert_file = sg_cert_file;
+		initParams->key_file = sg_key_file;
+	}
+	else
+	{
+    	//initParams->device_secret = info_read.devSerc;	/* 值无法传出去 */
+    	initParams->device_secret = "BhKEOITUbhtxU2z7rW+d0Q==";
+	}
+
 	initParams->command_timeout = QCLOUD_IOT_MQTT_COMMAND_TIMEOUT;
 	initParams->keep_alive_interval_ms = QCLOUD_IOT_MQTT_KEEP_ALIVE_INTERNAL;
 	initParams->auto_connect_enable = 1;
     initParams->event_handle.h_fp = event_handler;
+
+	Log_i("###### product_id %s, device_name %s, device_secret %s", 
+			initParams->product_id, initParams->device_name, initParams->device_secret);
 
     return QCLOUD_ERR_SUCCESS;
 }
@@ -170,11 +189,27 @@ static int _publish_msg(void *client, char* action, char* targetDeviceName)
         return -1;
 
     char topic_name[128] = {0};
-	DeviceInfo info_read;
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
 	
-	IOT_Device_Info_Flash_Read(&info_read);
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		return QCLOUD_ERR_FAILURE;
+	}
+	//DeviceInfo info_read;
 	
-    sprintf(topic_name,"%s/%s/%s", info_read.product_id, info_read.device_name, "event");
+	//IOT_Device_Info_Flash_Read(&info_read);
+    //sprintf(topic_name,"%s/%s/%s", info_read.product_id, info_read.device_name, "event");
+
+	if (AUTH_MODE_CERT_TLS == authmode)
+	{	
+		sprintf(topic_name,"%s/%s/%s", "6SF5233CVA", "door1", "event");
+	}
+	else
+	{
+		sprintf(topic_name,"%s/%s/%s", "LN19CSVR64", "door1", "event");
+	}
 
     PublishParams pub_params = DEFAULT_PUB_PARAMS;
     pub_params.qos = QOS1;
@@ -219,6 +254,8 @@ int main(int argc, char **argv)
 
     int rc;
 
+	HAL_SetAuthMode(AUTH_MODE_CERT_TLS);
+
     //init connection
     MQTTInitParams init_params = DEFAULT_MQTTINIT_PARAMS;
     rc = _setup_connect_init_params(&init_params);
@@ -227,6 +264,8 @@ int main(int argc, char **argv)
 		return rc;
 	}
 
+	Log_i("##### product_id %s, device_name %s", init_params.product_id, init_params.device_name);
+	
     void *client = IOT_MQTT_Construct(&init_params);
     if (client != NULL) {
         Log_i("Cloud Device Construct Success");

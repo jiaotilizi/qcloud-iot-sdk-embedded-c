@@ -25,12 +25,10 @@
 #include "lite-utils.h"
 
 /* 产品名称, 与云端同步设备状态时需要  */
-#ifdef AUTH_MODE_CERT
-    static char sg_cert_file[PATH_MAX + 1];      //客户端证书全路径
-    static char sg_key_file[PATH_MAX + 1];       //客户端密钥全路径
-#endif
+static char sg_cert_file[PATH_MAX + 1];      //客户端证书全路径
+static char sg_key_file[PATH_MAX + 1];       //客户端密钥全路径
 
-static DeviceInfo sg_devInfo;
+//static DeviceInfo sg_devInfo;
 
 
 #define MAX_LENGTH_OF_UPDATE_JSON_BUFFER 200
@@ -189,34 +187,53 @@ static void on_message_callback(void *pClient, MQTTMessage *message, void *userD
  */
 static int _setup_connect_init_params(ShadowInitParams* initParams)
 {
-	int ret;
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
 
-	ret = HAL_GetDevInfo((void *)&sg_devInfo);	
-	if(QCLOUD_ERR_SUCCESS != ret){
-		return ret;
-	}
-	
-	initParams->device_name = sg_devInfo.device_name;
-	initParams->product_id = sg_devInfo.product_id;
+	//ret = HAL_GetDevInfo((void *)&sg_devInfo);	
+	//if(QCLOUD_ERR_SUCCESS != ret){
+	//	return ret;
+	//}
 
-#ifdef AUTH_MODE_CERT
-	/* 使用非对称加密*/
-	char certs_dir[PATH_MAX + 1] = "certs";
-	char current_path[PATH_MAX + 1];
-	char *cwd = getcwd(current_path, sizeof(current_path));
-	if (cwd == NULL)
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
 	{
-		Log_e("getcwd return NULL");
+		Log_e("get auth mode error!");
 		return QCLOUD_ERR_FAILURE;
 	}
-	sprintf(sg_cert_file, "%s/%s/%s", current_path, certs_dir, sg_devInfo.devCertFileName);
-	sprintf(sg_key_file, "%s/%s/%s", current_path, certs_dir, sg_devInfo.devPrivateKeyFileName);
+	Log_i("###### get auth mode %d", authmode);
 
-	initParams->cert_file = sg_cert_file;
-	initParams->key_file = sg_key_file;
-#else
-	initParams->device_secret = sg_devInfo.devSerc;
-#endif
+	if (AUTH_MODE_CERT_TLS == authmode)
+	{
+		initParams->product_id = "1EWIEGSMMR";			/* cert */
+		initParams->device_name = "airConditioner1";		
+	}
+	else
+	{
+		initParams->product_id = "DXAJRHTNPE";			/* key */
+		initParams->device_name = "airConditioner1";
+	}
+
+	if (AUTH_MODE_CERT_TLS == authmode)
+	{
+		/* 使用非对称加密*/
+		char certs_dir[PATH_MAX + 1] = "certs";
+		char current_path[PATH_MAX + 1];
+		char *cwd = getcwd(current_path, sizeof(current_path));
+		if (cwd == NULL)
+		{
+			Log_e("getcwd return NULL");
+			return QCLOUD_ERR_FAILURE;
+		}
+		sprintf(sg_cert_file, "%s/%s/%s", current_path, certs_dir, "airConditioner1_cert.crt");
+		sprintf(sg_key_file, "%s/%s/%s", current_path, certs_dir, "airConditioner1_private.key");
+
+		initParams->cert_file = sg_cert_file;
+		initParams->key_file = sg_key_file;
+	}
+	else
+	{
+		initParams->device_secret = "SK4IyovFFhoxYVpb4zFxVQ==";
+	}
 
     initParams->auto_connect_enable = 1;
     initParams->event_handle.h_fp = event_handler;
@@ -229,9 +246,31 @@ static int _setup_connect_init_params(ShadowInitParams* initParams)
  *
  */
 static int _register_subscribe_topics(void *client)
-{
+{	
+	int size = 0;
     static char topic_name[128] = {0};
-    int size = HAL_Snprintf(topic_name, sizeof(topic_name), "%s/%s/%s", sg_devInfo.product_id, sg_devInfo.device_name, "control");
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
+	
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
+	{
+		Log_e("get auth mode error!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	Log_i("Step Here: HAL_GetAuthMode");
+	
+	if (AUTH_MODE_CERT_TLS == authmode)
+	{
+    	size = HAL_Snprintf(topic_name, sizeof(topic_name), "%s/%s/%s", "1EWIEGSMMR", "airConditioner1", "control");
+	}
+	else
+	{
+		size = HAL_Snprintf(topic_name, sizeof(topic_name), "%s/%s/%s", "DXAJRHTNPE", "airConditioner1", "control");
+	}
+
+	Log_i("Step Here: HAL_Snprintf");
+	
     if (size < 0 || size > sizeof(topic_name) - 1)
     {
         Log_e("topic content length not enough! content size:%d  buf size:%d", size, (int)sizeof(topic_name));
@@ -245,6 +284,8 @@ static int _register_subscribe_topics(void *client)
 int main(int argc, char **argv) {
     int rc;
 
+	HAL_SetAuthMode(AUTH_MODE_CERT_TLS);
+	
     //init log level
     IOT_Log_Set_Level(DEBUG);
 
@@ -264,12 +305,15 @@ int main(int argc, char **argv) {
         return QCLOUD_ERR_FAILURE;
     }
 
+	Log_i("Step Here: IOT_Shadow_Construct");
+	
     //register subscribe topics here
     rc = _register_subscribe_topics(client);
     if (rc < 0) {
         Log_e("Client Subscribe Topic Failed: %d", rc);
         return rc;
     }
+	Log_i("Step Here: _register_subscribe_topics");
 
     while (IOT_Shadow_IsConnected(client) || rc == QCLOUD_ERR_MQTT_ATTEMPTING_RECONNECT || rc == QCLOUD_ERR_MQTT_RECONNECTED) {
 

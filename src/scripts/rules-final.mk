@@ -8,10 +8,10 @@ final-out :
 	mv ${COMP_LIB} ${FINAL_DIR}/lib/ && \
 	mv ${PLATFORM_LIB} ${FINAL_DIR}/lib
 	
-ifeq (,$(filter -DAUTH_WITH_NOTLS,$(CFLAGS)))
+#ifeq (,$(filter -DAUTH_WITH_NOTLS,$(CFLAGS)))
 	$(TOP_Q) \
 	mv ${TEMP_DIR}/*.a ${FINAL_DIR}/lib/
-endif
+#endif
 	
 	$(TOP_Q) \
 	rm -rf ${TEMP_DIR}

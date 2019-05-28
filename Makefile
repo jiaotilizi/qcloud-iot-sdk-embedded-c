@@ -72,10 +72,10 @@ PLATFORM_LIB		:= libiot_platform.a
 PLATFORM_LIB_COMPONENTS := \
     src/platform/os/$(PLATFORM_OS) \
     
-ifeq (,$(filter -DAUTH_WITH_NOTLS,$(CFLAGS)))
-	PLATFORM_LIB_COMPONENTS += \
-    src/platform/ssl/$(PLATFORM_SSL)
-endif
+#ifeq (,$(filter -DAUTH_WITH_NOTLS,$(CFLAGS)))
+PLATFORM_LIB_COMPONENTS += \
+src/platform/ssl/$(PLATFORM_SSL)
+#endif
     
 IOTPLATFORM_SRC_FILES := \
 
