@@ -58,8 +58,6 @@ void* IOT_MQTT_Construct(MQTTInitParams *pParams)
 	POINTER_SANITY_CHECK(pParams, NULL);
 	STRING_PTR_SANITY_CHECK(pParams->product_id, NULL);
 	STRING_PTR_SANITY_CHECK(pParams->device_name, NULL);
-
-	Log_i("##### product_id %s, device_name %s", pParams->product_id, pParams->device_name);
     
     iot_device_info_init();
 	if (iot_device_info_set(pParams->product_id, pParams->device_name) != QCLOUD_ERR_SUCCESS)

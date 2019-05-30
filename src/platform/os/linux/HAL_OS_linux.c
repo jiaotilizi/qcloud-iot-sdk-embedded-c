@@ -28,7 +28,7 @@
 #include "qcloud_iot_export.h"
 
 
-#define DEBUG_DEV_INFO_USED
+//#define DEBUG_DEV_INFO_USED
 
 #ifdef DEBUG_DEV_INFO_USED
 
@@ -47,11 +47,20 @@ static char sg_device_privatekey_file_name[MAX_SIZE_OF_DEVICE_KEY_FILE_NAME + 1]
 /* 设备密钥, TLS PSK认证方式*/
 static char sg_device_secret[MAX_SIZE_OF_DEVICE_SERC + 1] = "YOUR_IOT_PSK";
 
-
+/* 鉴权模式 */
 static DeviceAuthMode sg_auth_mode = AUTH_MODE_MAX;
 
+#else
+
+/* 结构体形式存放设备基本信息文件 */
+static char sg_iot_device_info_file[] = "/usr/TencentDevInfo.txt";
+/* 存放鉴权模式文件 */
+static char sg_iot_auth_mode_file[] = "/usr/TencentAuthMode.txt";
 
 #endif
+
+
+
 
 void *HAL_MutexCreate(void)
 {
@@ -157,6 +166,65 @@ void HAL_SleepMs(_IN_ uint32_t ms)
     usleep(1000 * ms);
 }
 
+int HAL_DevInfoFlashRead(void *pdevInfo) 
+{
+	FILE *fp = NULL;
+	int read_size = 0;
+	DeviceInfo *devInfo = (DeviceInfo *)pdevInfo;
+
+	//POINTER_SANITY_CHECK(device_info, QCLOUD_ERR_INVAL);
+	
+	memset((char *)devInfo, 0, sizeof(DeviceInfo));
+	
+	if (NULL == (fp = fopen(sg_iot_device_info_file, "r+")))
+	{
+		Log_e("Open Device Info File Failed");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	read_size = fread(devInfo, sizeof(DeviceInfo), 1, fp);
+	fclose(fp);
+
+	return (1 == read_size)? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
+}
+
+int HAL_DevInfoFlashWrite(void *pdevInfo) 
+{
+	FILE *fp = NULL;
+	int write_size = 0;
+	DeviceInfo *devInfo = (DeviceInfo *)pdevInfo;
+
+	//POINTER_SANITY_CHECK(device_info, QCLOUD_ERR_INVAL);
+	
+	if ((MAX_SIZE_OF_PRODUCT_ID) < strlen(devInfo->product_id))
+	{
+		Log_e("product name(%s) length:(%lu) exceeding limitation", devInfo->product_id, strlen(devInfo->product_id));
+		return QCLOUD_ERR_FAILURE;
+	}
+	if ((MAX_SIZE_OF_DEVICE_NAME) < strlen(devInfo->device_name))
+	{
+		Log_e("device name(%s) length:(%lu) exceeding limitation", devInfo->device_name, strlen(devInfo->device_name));
+		return QCLOUD_ERR_FAILURE;
+	}
+	if ((MAX_SIZE_OF_DEVICE_SERC) < strlen(devInfo->devSerc))
+	{
+		Log_e("device secret(%s) length:(%lu) exceeding limitation", devInfo->devSerc, strlen(devInfo->devSerc));
+		return QCLOUD_ERR_FAILURE;
+	}
+	
+	if (NULL == (fp = fopen(sg_iot_device_info_file, "w+")))
+	{
+		Log_e("Open Device Info File Failed");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	write_size = fwrite(devInfo, sizeof(DeviceInfo), 1, fp);
+	fclose(fp);
+
+	return (1 == write_size)? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
+}
+
+
 int HAL_GetProductID(char *pProductId, uint8_t maxlen)
 {
 #ifdef DEBUG_DEV_INFO_USED
@@ -169,8 +237,26 @@ int HAL_GetProductID(char *pProductId, uint8_t maxlen)
 
 	return QCLOUD_ERR_SUCCESS;
 #else
-	Log_e("HAL_GetProductID is not implement");
-	return QCLOUD_ERR_FAILURE;
+	int ret = 0;
+	DeviceInfo device_info;
+
+	if (NULL == pProductId) {
+		Log_e("ptr is NULL!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	memset(&device_info, 0, sizeof(DeviceInfo));
+	ret |= HAL_DevInfoFlashRead(&device_info);
+	
+	if (maxlen < strlen(device_info.product_id)) {
+		Log_e("exceeds the max length!");
+		return QCLOUD_ERR_FAILURE;
+	}
+	
+	memset(pProductId, '\0', maxlen);
+	strncpy(pProductId, device_info.product_id, maxlen);
+
+	return ret;
 #endif
 }
 
@@ -186,8 +272,26 @@ int HAL_GetProductKey(char *pProductKey, uint8_t maxlen)
 
 	return QCLOUD_ERR_SUCCESS;
 #else
-	Log_e("HAL_GetProductKey is not implement");
-	return QCLOUD_ERR_FAILURE;
+	int ret = 0;
+	DeviceInfo device_info;
+
+	if (NULL == pProductKey) {
+		Log_e("ptr is NULL!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	memset(&device_info, 0, sizeof(DeviceInfo));
+	ret |= HAL_DevInfoFlashRead(&device_info);
+	
+	if (maxlen < strlen(device_info.product_key)) {
+		Log_e("exceeds the max length!");
+		return QCLOUD_ERR_FAILURE;
+	}
+	
+	memset(pProductKey, '\0', maxlen);
+	strncpy(pProductKey, device_info.product_key, maxlen);
+
+	return ret;
 #endif
 }
 
@@ -204,8 +308,26 @@ int HAL_GetDevName(char *pDevName, uint8_t maxlen)
 
 	return QCLOUD_ERR_SUCCESS;
 #else
-	Log_e("HAL_GetDevName is not implement");
-	return QCLOUD_ERR_FAILURE;
+	int ret = 0;
+	DeviceInfo device_info;
+
+	if (NULL == pDevName) {
+		Log_e("ptr is NULL!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	memset(&device_info, 0, sizeof(DeviceInfo));
+	ret |= HAL_DevInfoFlashRead(&device_info);
+	
+	if (maxlen < strlen(device_info.device_name)) {
+		Log_e("exceeds the max length!");
+		return QCLOUD_ERR_FAILURE;
+	}
+	
+	memset(pDevName, '\0', maxlen);
+	strncpy(pDevName, device_info.device_name, maxlen);
+
+	return ret;
 #endif
 }
 
@@ -222,8 +344,21 @@ int HAL_SetProductID(const char *pProductId)
 
 	return QCLOUD_ERR_SUCCESS;
 #else
-	Log_e("HAL_SetProductID is not implement");
-	return QCLOUD_ERR_FAILURE;
+	int ret = 0;
+	DeviceInfo device_info;
+
+	if (NULL == pProductId) {
+		Log_e("ptr is NULL!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	memset(&device_info, 0, sizeof(DeviceInfo));
+	ret |= HAL_DevInfoFlashRead(&device_info);
+	
+	strncpy(device_info.product_id, pProductId, MAX_SIZE_OF_PRODUCT_ID);
+	ret |= HAL_DevInfoFlashWrite(&device_info);
+
+	return ret;
 #endif
 }
 
@@ -240,8 +375,21 @@ int HAL_SetProductKey(const char *pProductKey)
 
 	return QCLOUD_ERR_SUCCESS;
 #else
-	Log_e("HAL_SetDevName is not implement");
-	return QCLOUD_ERR_FAILURE;
+	int ret = 0;
+	DeviceInfo device_info;
+
+	if (NULL == pProductKey) {
+		Log_e("ptr is NULL!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	memset(&device_info, 0, sizeof(DeviceInfo));	
+	ret |= HAL_DevInfoFlashRead(&device_info);
+	
+	strncpy(device_info.product_key, pProductKey, MAX_SIZE_OF_PRODUCT_KEY);
+	ret |= HAL_DevInfoFlashWrite(&device_info);
+
+	return ret;
 #endif
 
 }
@@ -258,8 +406,21 @@ int HAL_SetDevName(const char *pDevName)
 
 	return QCLOUD_ERR_SUCCESS;
 #else
-	Log_e("HAL_SetDevName is not implement");
-	return QCLOUD_ERR_FAILURE;
+	int ret = 0;
+	DeviceInfo device_info;
+
+	if (NULL == pDevName) {
+		Log_e("ptr is NULL!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	memset(&device_info, 0, sizeof(DeviceInfo));
+	ret |= HAL_DevInfoFlashRead(&device_info);
+	
+	strncpy(device_info.device_name, pDevName, MAX_SIZE_OF_DEVICE_NAME);
+	ret |= HAL_DevInfoFlashWrite(&device_info);
+
+	return ret;
 #endif
 }
 
@@ -275,8 +436,26 @@ int HAL_GetDevCertName(char *pDevCert, uint8_t maxlen)
 
 	return QCLOUD_ERR_SUCCESS;
 #else
-	Log_e("HAL_GetDevCertName is not implement");
-	return QCLOUD_ERR_FAILURE;
+	int ret = 0;
+	DeviceInfo device_info;
+
+	if (NULL == pDevCert) {
+		Log_e("ptr is NULL!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	memset(&device_info, 0, sizeof(DeviceInfo));
+	ret |= HAL_DevInfoFlashRead(&device_info);
+	
+	if (maxlen < strlen(device_info.devCertFileName)) {
+		Log_e("exceeds the max length!");
+		return QCLOUD_ERR_FAILURE;
+	}
+	
+	memset(pDevCert, '\0', maxlen);
+	strncpy(pDevCert, device_info.devCertFileName, maxlen);
+
+	return ret;
 #endif
 }
 
@@ -292,8 +471,26 @@ int HAL_GetDevPrivateKeyName(char *pDevPrivateKey, uint8_t maxlen)
 
 	return QCLOUD_ERR_SUCCESS;
 #else
-	Log_e("HAL_GetDevPrivateKeyName is not implement");
-	return QCLOUD_ERR_FAILURE;
+	int ret = 0;
+	DeviceInfo device_info;
+
+	if (NULL == pDevPrivateKey) {
+		Log_e("ptr is NULL!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	memset(&device_info, 0, sizeof(DeviceInfo));
+	ret |= HAL_DevInfoFlashRead(&device_info);
+	
+	if (maxlen < strlen(device_info.devPrivateKeyFileName)) {
+		Log_e("exceeds the max length!");
+		return QCLOUD_ERR_FAILURE;
+	}
+	
+	memset(pDevPrivateKey, '\0', maxlen);
+	strncpy(pDevPrivateKey, device_info.devPrivateKeyFileName, maxlen);
+
+	return ret;
 #endif
 
 }
@@ -310,8 +507,21 @@ int HAL_SetDevCertName(char *pDevCert)
 
 	return QCLOUD_ERR_SUCCESS;
 #else
-	Log_e("HAL_SetDevCertName is not implement");
-	return QCLOUD_ERR_FAILURE;
+	int ret = 0;
+	DeviceInfo device_info;
+
+	if (NULL == pDevCert) {
+		Log_e("ptr is NULL!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	memset(&device_info, 0, sizeof(DeviceInfo));
+	ret |= HAL_DevInfoFlashRead(&device_info);
+	
+	strncpy(device_info.devCertFileName, pDevCert, MAX_SIZE_OF_DEVICE_CERT_FILE_NAME);
+	ret |= HAL_DevInfoFlashWrite(&device_info);
+
+	return ret;
 #endif
 }
 
@@ -327,8 +537,21 @@ int HAL_SetDevPrivateKeyName(char *pDevPrivateKey)
 
 	return QCLOUD_ERR_SUCCESS;
 #else
-	Log_e("HAL_SetDevPrivateKeyName is not implement");
-	return QCLOUD_ERR_FAILURE;
+	int ret = 0;
+	DeviceInfo device_info;
+
+	if (NULL == pDevPrivateKey) {
+		Log_e("ptr is NULL!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	memset(&device_info, 0, sizeof(DeviceInfo));
+	ret |= HAL_DevInfoFlashRead(&device_info);
+	
+	strncpy(device_info.devPrivateKeyFileName, pDevPrivateKey, MAX_SIZE_OF_DEVICE_KEY_FILE_NAME);
+	ret |= HAL_DevInfoFlashWrite(&device_info);
+
+	return ret;
 #endif
 }
 
@@ -345,8 +568,26 @@ int HAL_GetDevSec(char *pDevSec, uint8_t maxlen)
 
 	return QCLOUD_ERR_SUCCESS;
 #else
-	Log_e("HAL_GetDevSec is not implement");
-	return QCLOUD_ERR_FAILURE;
+	int ret = 0;
+	DeviceInfo device_info;
+
+	if (NULL == pDevSec) {
+		Log_e("ptr is NULL!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	memset(&device_info, 0, sizeof(DeviceInfo));
+	ret |= HAL_DevInfoFlashRead(&device_info);
+	
+	if (maxlen < strlen(device_info.devSerc)) {
+		Log_e("exceeds the max length!");
+		return QCLOUD_ERR_FAILURE;
+	}
+	
+	memset(pDevSec, '\0', maxlen);
+	strncpy(pDevSec, device_info.devSerc, maxlen);
+
+	return ret;
 #endif
 
 
@@ -364,8 +605,21 @@ int HAL_SetDevSec(const char *pDevSec)
 
 	return QCLOUD_ERR_SUCCESS;
 #else
-	Log_e("HAL_SetDevSec is not implement");
-	return QCLOUD_ERR_FAILURE;
+	int ret = 0;
+	DeviceInfo device_info;
+
+	if (NULL == pDevSec) {
+		Log_e("ptr is NULL!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	memset(&device_info, 0, sizeof(DeviceInfo));
+	ret |= HAL_DevInfoFlashRead(&device_info);
+	
+	strncpy(device_info.devSerc, pDevSec, MAX_SIZE_OF_DEVICE_SERC);
+	ret |= HAL_DevInfoFlashWrite(&device_info);
+
+	return ret;
 #endif
 }
 
@@ -388,7 +642,7 @@ int HAL_GetDevInfo(void *pdevInfo)
 	}
 	else
 	{
-		ret |= HAL_GetDevSec(devInfo->devSerc, MAX_SIZE_OF_PRODUCT_KEY);
+		ret |= HAL_GetDevSec(devInfo->devSerc, MAX_SIZE_OF_DEVICE_SERC);
 	}
 
 	if(QCLOUD_ERR_SUCCESS != ret){
@@ -410,8 +664,23 @@ int HAL_GetAuthMode(DeviceAuthMode *mode)
 
 	return QCLOUD_ERR_SUCCESS;
 #else
-	Log_e("HAL_GetAuthMode is not implement");
-	return QCLOUD_ERR_FAILURE;
+	FILE *fp = NULL;
+	int read_size = 0;
+
+	if (NULL == mode) {
+		Log_e("ptr is NULL!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	if (NULL == (fp = fopen(sg_iot_auth_mode_file, "r+"))) {
+		Log_e("open auth mode file failed!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	read_size = fread(mode, sizeof(DeviceAuthMode), 1, fp);
+	fclose(fp);
+	
+	return (1 == read_size)? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
 #endif
 }
 
@@ -426,8 +695,23 @@ int HAL_SetAuthMode(DeviceAuthMode mode)
 
 	return QCLOUD_ERR_SUCCESS;
 #else
-	Log_e("HAL_SetAuthMode is not implement");
-	return QCLOUD_ERR_FAILURE;
+	FILE *fp = NULL;
+	int read_size = 0;
+
+	if (AUTH_MODE_MAX <= mode) {
+		Log_e("exceeds the max mode!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	if (NULL == (fp = fopen(sg_iot_auth_mode_file, "w+"))) {
+		Log_e("open auth mode file failed!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	read_size = fwrite(&mode, sizeof(DeviceAuthMode), 1, fp);
+	fclose(fp);
+	
+	return (1 == read_size)? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
 #endif
 }
 

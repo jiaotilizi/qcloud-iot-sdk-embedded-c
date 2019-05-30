@@ -29,10 +29,10 @@ config:
 	
 mbedtls:
 #ifeq (,$(filter -DAUTH_WITH_NOTLS,$(CFLAGS)))
-	$(TOP_Q) \
-	chmod a+x $(SCRIPT_DIR)/update_mbedtls.sh
-	$(TOP_Q) \
-	$(SCRIPT_DIR)/update_mbedtls.sh > /dev/null
+#$(TOP_Q) \
+#chmod a+x $(SCRIPT_DIR)/update_mbedtls.sh
+#$(TOP_Q) \
+#$(SCRIPT_DIR)/update_mbedtls.sh > /dev/null
 
 	$(TOP_Q) \
 	make -s -C $(THIRD_PARTY_PATH)/mbedtls lib -e CC=$(PLATFORM_CC) AR=$(PLATFORM_AR)
