@@ -28,7 +28,7 @@
 static char sg_cert_file[PATH_MAX + 1];      //客户端证书全路径
 static char sg_key_file[PATH_MAX + 1];       //客户端密钥全路径
 
-//static DeviceInfo sg_devInfo;
+static DeviceInfo sg_devInfo;
 
 
 #define MAX_LENGTH_OF_UPDATE_JSON_BUFFER 200
@@ -187,12 +187,9 @@ static void on_message_callback(void *pClient, MQTTMessage *message, void *userD
  */
 static int _setup_connect_init_params(ShadowInitParams* initParams)
 {
-	DeviceAuthMode authmode = AUTH_MODE_MAX;
+	int ret;
 
-	//ret = HAL_GetDevInfo((void *)&sg_devInfo);	
-	//if(QCLOUD_ERR_SUCCESS != ret){
-	//	return ret;
-	//}
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
 
 	/* 获取鉴权模式 */
 	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
@@ -201,17 +198,25 @@ static int _setup_connect_init_params(ShadowInitParams* initParams)
 		return QCLOUD_ERR_FAILURE;
 	}
 	Log_i("###### get auth mode %d", authmode);
-
-	if (AUTH_MODE_CERT_TLS == authmode)
+	
+	if (AUTH_MODE_CERT_TLS != authmode)
 	{
-		initParams->product_id = "1EWIEGSMMR";			/* cert */
-		initParams->device_name = "airConditioner1";		
+		ret |= HAL_SetProductID("DXAJRHTNPE");
+		ret |= HAL_SetDevName("airConditioner1");
+		ret |= HAL_SetDevSec("SK4IyovFFhoxYVpb4zFxVQ==");
 	}
 	else
-	{
-		initParams->product_id = "DXAJRHTNPE";			/* key */
-		initParams->device_name = "airConditioner1";
+	{		
+		ret |= HAL_SetProductID("1EWIEGSMMR");
+		ret |= HAL_SetDevName("airConditioner1");
+		ret |= HAL_SetDevCertName("airConditioner1_cert.crt");
+		ret |= HAL_SetDevPrivateKeyName("airConditioner1_private.key");
 	}
+
+	ret |= HAL_GetDevInfo((void *)&sg_devInfo);
+	
+	initParams->device_name = sg_devInfo.device_name;
+	initParams->product_id = sg_devInfo.product_id;
 
 	if (AUTH_MODE_CERT_TLS == authmode)
 	{
@@ -224,19 +229,23 @@ static int _setup_connect_init_params(ShadowInitParams* initParams)
 			Log_e("getcwd return NULL");
 			return QCLOUD_ERR_FAILURE;
 		}
-		sprintf(sg_cert_file, "%s/%s/%s", current_path, certs_dir, "airConditioner1_cert.crt");
-		sprintf(sg_key_file, "%s/%s/%s", current_path, certs_dir, "airConditioner1_private.key");
+		sprintf(sg_cert_file, "%s/%s/%s", current_path, certs_dir, sg_devInfo.devCertFileName);
+		sprintf(sg_key_file, "%s/%s/%s", current_path, certs_dir, sg_devInfo.devPrivateKeyFileName);
 
 		initParams->cert_file = sg_cert_file;
 		initParams->key_file = sg_key_file;
 	}
 	else
 	{
-		initParams->device_secret = "SK4IyovFFhoxYVpb4zFxVQ==";
+		initParams->device_secret = sg_devInfo.devSerc;
 	}
 
     initParams->auto_connect_enable = 1;
     initParams->event_handle.h_fp = event_handler;
+
+	Log_i("###### HAL_GetDevInfo: product_id %s, device_name %s, device_secret %s, devCertFileName %s, devPrivateKeyFileName %s", 
+			sg_devInfo.product_id, sg_devInfo.device_name, sg_devInfo.devSerc, 
+			sg_devInfo.devCertFileName, sg_devInfo.devPrivateKeyFileName);
 
     return QCLOUD_ERR_SUCCESS;
 }
@@ -246,31 +255,9 @@ static int _setup_connect_init_params(ShadowInitParams* initParams)
  *
  */
 static int _register_subscribe_topics(void *client)
-{	
-	int size = 0;
+{
     static char topic_name[128] = {0};
-	DeviceAuthMode authmode = AUTH_MODE_MAX;
-	
-	/* 获取鉴权模式 */
-	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
-	{
-		Log_e("get auth mode error!");
-		return QCLOUD_ERR_FAILURE;
-	}
-
-	Log_i("Step Here: HAL_GetAuthMode");
-	
-	if (AUTH_MODE_CERT_TLS == authmode)
-	{
-    	size = HAL_Snprintf(topic_name, sizeof(topic_name), "%s/%s/%s", "1EWIEGSMMR", "airConditioner1", "control");
-	}
-	else
-	{
-		size = HAL_Snprintf(topic_name, sizeof(topic_name), "%s/%s/%s", "DXAJRHTNPE", "airConditioner1", "control");
-	}
-
-	Log_i("Step Here: HAL_Snprintf");
-	
+    int size = HAL_Snprintf(topic_name, sizeof(topic_name), "%s/%s/%s", sg_devInfo.product_id, sg_devInfo.device_name, "control");
     if (size < 0 || size > sizeof(topic_name) - 1)
     {
         Log_e("topic content length not enough! content size:%d  buf size:%d", size, (int)sizeof(topic_name));
@@ -284,7 +271,7 @@ static int _register_subscribe_topics(void *client)
 int main(int argc, char **argv) {
     int rc;
 
-	HAL_SetAuthMode(AUTH_MODE_CERT_TLS);
+	HAL_SetAuthMode(AUTH_MODE_KEY_TLS);
 	
     //init log level
     IOT_Log_Set_Level(DEBUG);
@@ -305,15 +292,12 @@ int main(int argc, char **argv) {
         return QCLOUD_ERR_FAILURE;
     }
 
-	Log_i("Step Here: IOT_Shadow_Construct");
-	
     //register subscribe topics here
     rc = _register_subscribe_topics(client);
     if (rc < 0) {
         Log_e("Client Subscribe Topic Failed: %d", rc);
         return rc;
     }
-	Log_i("Step Here: _register_subscribe_topics");
 
     while (IOT_Shadow_IsConnected(client) || rc == QCLOUD_ERR_MQTT_ATTEMPTING_RECONNECT || rc == QCLOUD_ERR_MQTT_RECONNECTED) {
 

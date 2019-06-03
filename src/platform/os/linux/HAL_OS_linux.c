@@ -175,10 +175,17 @@ int HAL_DevInfoFlashRead(void *pdevInfo)
 	//POINTER_SANITY_CHECK(device_info, QCLOUD_ERR_INVAL);
 	
 	memset((char *)devInfo, 0, sizeof(DeviceInfo));
+
+	if (0 != access(sg_iot_device_info_file, 0)) {
+		if (NULL != (fp = fopen(sg_iot_device_info_file, "w+"))) {
+			fclose(fp);
+			Log_i("Creat File: %s!", sg_iot_device_info_file);
+			return QCLOUD_ERR_SUCCESS;
+		}
+	}
 	
-	if (NULL == (fp = fopen(sg_iot_device_info_file, "r+")))
-	{
-		Log_e("Open Device Info File Failed");
+	if (NULL == (fp = fopen(sg_iot_device_info_file, "r+"))) {
+		Log_e("Open File %s Failed!", sg_iot_device_info_file);
 		return QCLOUD_ERR_FAILURE;
 	}
 
@@ -196,24 +203,20 @@ int HAL_DevInfoFlashWrite(void *pdevInfo)
 
 	//POINTER_SANITY_CHECK(device_info, QCLOUD_ERR_INVAL);
 	
-	if ((MAX_SIZE_OF_PRODUCT_ID) < strlen(devInfo->product_id))
-	{
+	if ((MAX_SIZE_OF_PRODUCT_ID) < strlen(devInfo->product_id)) {
 		Log_e("product name(%s) length:(%lu) exceeding limitation", devInfo->product_id, strlen(devInfo->product_id));
 		return QCLOUD_ERR_FAILURE;
 	}
-	if ((MAX_SIZE_OF_DEVICE_NAME) < strlen(devInfo->device_name))
-	{
+	if ((MAX_SIZE_OF_DEVICE_NAME) < strlen(devInfo->device_name)) {
 		Log_e("device name(%s) length:(%lu) exceeding limitation", devInfo->device_name, strlen(devInfo->device_name));
 		return QCLOUD_ERR_FAILURE;
 	}
-	if ((MAX_SIZE_OF_DEVICE_SERC) < strlen(devInfo->devSerc))
-	{
+	if ((MAX_SIZE_OF_DEVICE_SERC) < strlen(devInfo->devSerc)) {
 		Log_e("device secret(%s) length:(%lu) exceeding limitation", devInfo->devSerc, strlen(devInfo->devSerc));
 		return QCLOUD_ERR_FAILURE;
 	}
 	
-	if (NULL == (fp = fopen(sg_iot_device_info_file, "w+")))
-	{
+	if (NULL == (fp = fopen(sg_iot_device_info_file, "w+"))) {
 		Log_e("Open Device Info File Failed");
 		return QCLOUD_ERR_FAILURE;
 	}
@@ -352,6 +355,11 @@ int HAL_SetProductID(const char *pProductId)
 		return QCLOUD_ERR_FAILURE;
 	}
 
+	if (MAX_SIZE_OF_PRODUCT_ID < strlen(pProductId)) {
+		Log_e("exceeds the max length!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
 	memset(&device_info, 0, sizeof(DeviceInfo));
 	ret |= HAL_DevInfoFlashRead(&device_info);
 	
@@ -383,6 +391,11 @@ int HAL_SetProductKey(const char *pProductKey)
 		return QCLOUD_ERR_FAILURE;
 	}
 
+	if (MAX_SIZE_OF_PRODUCT_KEY < strlen(pProductKey)) {
+		Log_e("exceeds the max length!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
 	memset(&device_info, 0, sizeof(DeviceInfo));	
 	ret |= HAL_DevInfoFlashRead(&device_info);
 	
@@ -411,6 +424,11 @@ int HAL_SetDevName(const char *pDevName)
 
 	if (NULL == pDevName) {
 		Log_e("ptr is NULL!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	if (MAX_SIZE_OF_DEVICE_NAME < strlen(pDevName)) {
+		Log_e("exceeds the max length!");
 		return QCLOUD_ERR_FAILURE;
 	}
 
@@ -515,6 +533,11 @@ int HAL_SetDevCertName(char *pDevCert)
 		return QCLOUD_ERR_FAILURE;
 	}
 
+	if (MAX_SIZE_OF_DEVICE_CERT_FILE_NAME < strlen(pDevCert)) {
+		Log_e("exceeds the max length!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
 	memset(&device_info, 0, sizeof(DeviceInfo));
 	ret |= HAL_DevInfoFlashRead(&device_info);
 	
@@ -542,6 +565,11 @@ int HAL_SetDevPrivateKeyName(char *pDevPrivateKey)
 
 	if (NULL == pDevPrivateKey) {
 		Log_e("ptr is NULL!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
+	if (MAX_SIZE_OF_DEVICE_KEY_FILE_NAME < strlen(pDevPrivateKey)) {
+		Log_e("exceeds the max length!");
 		return QCLOUD_ERR_FAILURE;
 	}
 
@@ -613,6 +641,11 @@ int HAL_SetDevSec(const char *pDevSec)
 		return QCLOUD_ERR_FAILURE;
 	}
 
+	if (MAX_SIZE_OF_DEVICE_SERC < strlen(pDevSec)) {
+		Log_e("exceeds the max length!");
+		return QCLOUD_ERR_FAILURE;
+	}
+
 	memset(&device_info, 0, sizeof(DeviceInfo));
 	ret |= HAL_DevInfoFlashRead(&device_info);
 	
@@ -672,8 +705,16 @@ int HAL_GetAuthMode(DeviceAuthMode *mode)
 		return QCLOUD_ERR_FAILURE;
 	}
 
+	if (0 != access(sg_iot_auth_mode_file, 0)) {
+		if (NULL != (fp = fopen(sg_iot_auth_mode_file, "w+"))) {
+			fclose(fp);
+			Log_i("Creat File: %s!", sg_iot_auth_mode_file);
+			return QCLOUD_ERR_SUCCESS;
+		}
+	}
+
 	if (NULL == (fp = fopen(sg_iot_auth_mode_file, "r+"))) {
-		Log_e("open auth mode file failed!");
+		Log_e("Open File %s Failed!", sg_iot_auth_mode_file);
 		return QCLOUD_ERR_FAILURE;
 	}
 

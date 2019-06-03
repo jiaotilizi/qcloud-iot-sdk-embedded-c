@@ -182,27 +182,7 @@ static int _publish_msg(void *client, char* action, char* targetDeviceName)
         return -1;
 
     char topic_name[128] = {0};
-	DeviceAuthMode authmode = AUTH_MODE_MAX;
-	
-	/* 获取鉴权模式 */
-	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
-	{
-		Log_e("get auth mode error!");
-		return QCLOUD_ERR_FAILURE;
-	}
-	//DeviceInfo info_read;
-	
-	//IOT_Device_Info_Flash_Read(&info_read);
-    //sprintf(topic_name,"%s/%s/%s", info_read.product_id, info_read.device_name, "event");
-
-	if (AUTH_MODE_CERT_TLS == authmode)
-	{	
-		sprintf(topic_name,"%s/%s/%s", "6SF5233CVA", "door1", "event");
-	}
-	else
-	{
-		sprintf(topic_name,"%s/%s/%s", "LN19CSVR64", "door1", "event");
-	}
+    sprintf(topic_name,"%s/%s/%s", sg_devInfo.product_id, sg_devInfo.device_name, "event");
 
     PublishParams pub_params = DEFAULT_PUB_PARAMS;
     pub_params.qos = QOS1;
@@ -258,13 +238,22 @@ int main(int argc, char **argv)
 		return rc;
 	}
 
-	Log_i("##### product_id %s, device_name %s", init_params.product_id, init_params.device_name);
-	
     void *client = IOT_MQTT_Construct(&init_params);
     if (client != NULL) {
         Log_i("Cloud Device Construct Success");
     } else {
         Log_e("Cloud Device Construct Failed");
+        return QCLOUD_ERR_FAILURE;
+    }
+
+	rc = IOT_MQTT_Destroy(&client);
+	Log_i("### IOT_MQTT_Destroy rc = %d", rc);
+
+	client = IOT_MQTT_Construct(&init_params);
+    if (client != NULL) {
+        Log_i("### Cloud Device Construct Success");
+    } else {
+        Log_e("### Cloud Device Construct Failed");
         return QCLOUD_ERR_FAILURE;
     }
 

@@ -386,9 +386,17 @@ static int _handle_saved_log(void)
 
 void set_log_mqtt_client(void *client)
 {
+	if (NULL == client) {
+		/* destroy时, 将log全局变量置为初始状态 */
+		extern bool sg_log_sub_ok;
+		extern unsigned int sg_client_token;
+		sg_log_sub_ok = false;
+		sg_client_token = 1;
+	}
+	
     if (!sg_log_uploader_init_done)
         return ;
-    
+	
     sg_uploader->mqtt_client = client;
 }
 

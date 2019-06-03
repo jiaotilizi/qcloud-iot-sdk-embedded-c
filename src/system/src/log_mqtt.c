@@ -24,10 +24,10 @@
 
 
 static bool sg_log_recv_ok   = false;
-static bool sg_log_sub_ok   = false;
+bool sg_log_sub_ok   = false;
 static MQTTEventHandleFun sg_log_EventHandle = NULL;
 static int sg_log_level = ERROR;
-static unsigned int sg_client_token = 1;
+unsigned int sg_client_token = 1;
 
 static bool _get_json_log_level(char *json, int32_t* res) {
 	char *v = LITE_json_value_of("log_level", json);
@@ -175,9 +175,12 @@ int qcloud_get_log_level(void* pClient, int *log_level)
     POINTER_SANITY_CHECK(pClient, QCLOUD_ERR_INVAL);
     Qcloud_IoT_Client   *mqtt_client = (Qcloud_IoT_Client *)pClient;
 
+	Log_d("Step 1, log_level = %d", *log_level);
+
     //如果第一次订阅$log/operation/get/${productid}/${devicename}, 则执行订阅操作
     //否则，防止多次获取日志等级的情况下，多次重复订阅
     if(!sg_log_sub_ok){
+		Log_d("Step 2, sg_log_sub_ok = %d", sg_log_sub_ok);
         sg_log_EventHandle = mqtt_client->event_handle.h_fp;
         mqtt_client->event_handle.h_fp = _log_mqtt_event_handler;
 
@@ -187,14 +190,17 @@ int qcloud_get_log_level(void* pClient, int *log_level)
                 Log_w("qcloud_log_topic_subscribe failed: %d, cnt: %d", ret, cntSub);
                 continue;
             }
+			Log_d("Step 3, cntSub = %d ret = %d", cntSub, ret);
 
             /* wait for sub ack */
             ret = qcloud_iot_mqtt_yield((Qcloud_IoT_Client *)pClient, 100);
+			Log_d("Step 4, sg_log_sub_ok = %d ret = %d", sg_log_sub_ok, ret);
             if(sg_log_sub_ok) {                
                 break;
             }
         }
         mqtt_client->event_handle.h_fp = sg_log_EventHandle;
+		Log_d("Step 5");
     }
 
     // 如果订阅3次均失败，则直接返回失败
@@ -203,6 +209,8 @@ int qcloud_get_log_level(void* pClient, int *log_level)
         return QCLOUD_ERR_FAILURE;
     }
 
+	Log_d("Step 6, sg_log_sub_ok = %d", sg_log_sub_ok);
+
     sg_log_recv_ok = false;
     // 发布获取时间
 	ret = _iot_log_level_get_publish(mqtt_client);
@@ -210,18 +218,24 @@ int qcloud_get_log_level(void* pClient, int *log_level)
 		Log_e("client publish log topic failed :%d", ret);
         return ret;
 	}
+	Log_d("Step 7, sg_log_recv_ok = %d ret = %d", sg_log_recv_ok, ret);
 
     do{
         ret = qcloud_iot_mqtt_yield((Qcloud_IoT_Client *)pClient, 100);
         cntRev++;
+		Log_d("Step 8, sg_log_recv_ok = %d ret = %d cntRev = %d", sg_log_recv_ok, ret, cntRev);
     }while(!sg_log_recv_ok && cntRev < 20);
 
+	Log_d("Step 9, *log_level = %d sg_log_level = %d sg_log_recv_ok = %d", *log_level, sg_log_level, sg_log_recv_ok);
+	
     *log_level = sg_log_level;
     if (sg_log_recv_ok)
         ret = QCLOUD_ERR_SUCCESS;
     else
         ret = QCLOUD_ERR_FAILURE;
-
+	
+	Log_d("Step 10, ret = %d", ret);
+	
     return ret;
 }
 
