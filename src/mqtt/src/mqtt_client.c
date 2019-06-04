@@ -161,7 +161,10 @@ int IOT_MQTT_Destroy(void **pClient) {
     *pClient = NULL;
 #ifdef LOG_UPLOAD    
     set_log_mqtt_client(NULL);
-#endif    
+#endif
+
+	iot_device_info_destroy();
+
     Log_i("mqtt release!");
 
 	return rc;

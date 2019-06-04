@@ -166,6 +166,7 @@ void HAL_SleepMs(_IN_ uint32_t ms)
     usleep(1000 * ms);
 }
 
+#ifndef DEBUG_DEV_INFO_USED
 int HAL_DevInfoFlashRead(void *pdevInfo) 
 {
 	FILE *fp = NULL;
@@ -176,11 +177,15 @@ int HAL_DevInfoFlashRead(void *pdevInfo)
 	
 	memset((char *)devInfo, 0, sizeof(DeviceInfo));
 
+	/* 文件不存在时, 则首次进行创建, 并写入初始数值 */
 	if (0 != access(sg_iot_device_info_file, 0)) {
 		if (NULL != (fp = fopen(sg_iot_device_info_file, "w+"))) {
+			fwrite(devInfo, sizeof(DeviceInfo), 1, fp);
 			fclose(fp);
 			Log_i("Creat File: %s!", sg_iot_device_info_file);
-			return QCLOUD_ERR_SUCCESS;
+		} else {
+			Log_e("Creat File: %s Failed!", sg_iot_device_info_file);
+			return QCLOUD_ERR_FAILURE;
 		}
 	}
 	
@@ -226,7 +231,7 @@ int HAL_DevInfoFlashWrite(void *pdevInfo)
 
 	return (1 == write_size)? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
 }
-
+#endif
 
 int HAL_GetProductID(char *pProductId, uint8_t maxlen)
 {
@@ -705,11 +710,16 @@ int HAL_GetAuthMode(DeviceAuthMode *mode)
 		return QCLOUD_ERR_FAILURE;
 	}
 
+	/* 文件不存在时, 则首次进行创建, 并写入初始数值 */
 	if (0 != access(sg_iot_auth_mode_file, 0)) {
 		if (NULL != (fp = fopen(sg_iot_auth_mode_file, "w+"))) {
+			DeviceAuthMode init_mode = AUTH_MODE_MAX;
+			fwrite(&init_mode, sizeof(DeviceAuthMode), 1, fp);
 			fclose(fp);
 			Log_i("Creat File: %s!", sg_iot_auth_mode_file);
-			return QCLOUD_ERR_SUCCESS;
+		} else {
+			Log_e("Creat File: %s Failed!", sg_iot_auth_mode_file);
+			return QCLOUD_ERR_FAILURE;
 		}
 	}
 

@@ -28,10 +28,8 @@
 
 #define MAX_SIZE_OF_TOPIC_CONTENT 100
 
-#ifdef AUTH_MODE_CERT
-    static char sg_cert_file[PATH_MAX + 1];      //客户端证书全路径
-    static char sg_key_file[PATH_MAX + 1];       //客户端密钥全路径
-#endif
+static char sg_cert_file[PATH_MAX + 1];      //客户端证书全路径
+static char sg_key_file[PATH_MAX + 1];       //客户端密钥全路径
 
 static DeviceInfo sg_devInfo;
 static int sg_count = 0;
@@ -137,34 +135,53 @@ static void on_message_callback(void *pClient, MQTTMessage *message, void *userD
  */
 static int _setup_connect_init_params(MQTTInitParams* initParams)
 {
-	int ret;
+	int ret = 0;
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
+
+	/* 获取鉴权模式 */
+	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) {
+		Log_e("get auth mode error!");
+		return QCLOUD_ERR_FAILURE;
+	}
+	Log_i("###### get auth mode %d", authmode);
+
+	if (AUTH_MODE_CERT_TLS != authmode) {
+		ret |= HAL_SetProductID("LN19CSVR64");
+		ret |= HAL_SetDevName("door1");
+		ret |= HAL_SetDevSec("BhKEOITUbhtxU2z7rW+d0Q==");
+	} else {		
+		ret |= HAL_SetProductID("6SF5233CVA");
+		ret |= HAL_SetDevName("door1");
+		ret |= HAL_SetDevCertName("door1_cert.crt");
+		ret |= HAL_SetDevPrivateKeyName("door1_private.key");
+	}
 	
-	ret = HAL_GetDevInfo((void *)&sg_devInfo);	
-	if(QCLOUD_ERR_SUCCESS != ret){
+	ret |= HAL_GetDevInfo((void *)&sg_devInfo);	
+	if (QCLOUD_ERR_SUCCESS != ret) {
 		return ret;
 	}
 	
 	initParams->device_name = sg_devInfo.device_name;
 	initParams->product_id = sg_devInfo.product_id;
 
-#ifdef AUTH_MODE_CERT
-	/* 使用非对称加密*/
-	char certs_dir[PATH_MAX + 1] = "certs";
-	char current_path[PATH_MAX + 1];
-	char *cwd = getcwd(current_path, sizeof(current_path));
-	if (cwd == NULL)
-	{
-		Log_e("getcwd return NULL");
-		return QCLOUD_ERR_FAILURE;
-	}
-	sprintf(sg_cert_file, "%s/%s/%s", current_path, certs_dir, sg_devInfo.devCertFileName);
-	sprintf(sg_key_file, "%s/%s/%s", current_path, certs_dir, sg_devInfo.devPrivateKeyFileName);
+	if (AUTH_MODE_CERT_TLS == authmode) {
+		/* 使用非对称加密*/
+		char certs_dir[PATH_MAX + 1] = "certs";
+		char current_path[PATH_MAX + 1];
+		char *cwd = getcwd(current_path, sizeof(current_path));
+		if (cwd == NULL)
+		{
+			Log_e("getcwd return NULL");
+			return QCLOUD_ERR_FAILURE;
+		}
+		sprintf(sg_cert_file, "%s/%s/%s", current_path, certs_dir, sg_devInfo.devCertFileName);
+		sprintf(sg_key_file, "%s/%s/%s", current_path, certs_dir, sg_devInfo.devPrivateKeyFileName);
 
-	initParams->cert_file = sg_cert_file;
-	initParams->key_file = sg_key_file;
-#else
-	initParams->device_secret = sg_devInfo.devSerc;
-#endif
+		initParams->cert_file = sg_cert_file;
+		initParams->key_file = sg_key_file;
+	} else {
+		initParams->device_secret = sg_devInfo.devSerc;
+	}
 
 	initParams->command_timeout = QCLOUD_IOT_MQTT_COMMAND_TIMEOUT;
 	initParams->keep_alive_interval_ms = QCLOUD_IOT_MQTT_KEEP_ALIVE_INTERNAL;
@@ -172,6 +189,10 @@ static int _setup_connect_init_params(MQTTInitParams* initParams)
 	initParams->auto_connect_enable = 1;
 	initParams->event_handle.h_fp = event_handler;
 	initParams->event_handle.context = NULL;
+
+	Log_i("###### HAL_GetDevInfo: product_id %s, device_name %s, device_secret %s, devCertFileName %s, devPrivateKeyFileName %s", 
+			sg_devInfo.product_id, sg_devInfo.device_name, sg_devInfo.devSerc, 
+			sg_devInfo.devCertFileName, sg_devInfo.devPrivateKeyFileName);
 
     return QCLOUD_ERR_SUCCESS;
 }
@@ -308,6 +329,9 @@ int main(int argc, char **argv) {
     IOT_Log_Set_MessageHandler(log_handler);
     
     int rc;
+	int mode = atoi(argv[1]);
+
+	HAL_SetAuthMode(mode);
 
     // to avoid process crash when writing to a broken socket
     signal(SIGPIPE, SIG_IGN);
@@ -327,11 +351,13 @@ int main(int argc, char **argv) {
                         .device_name = sg_devInfo.device_name, .sign_key = NULL,
                         .read_func = _log_read_callback, .save_func = _log_save_callback,
                         .del_func = _log_del_callback, .get_size_func = _log_get_size_callback};
-#ifdef AUTH_MODE_CERT    
-    log_init_params.sign_key = sg_cert_file;
-#else
-    log_init_params.sign_key = sg_devInfo.devSerc;
-#endif
+
+	if (AUTH_MODE_CERT_TLS == mode) {   
+    	log_init_params.sign_key = sg_cert_file;
+	} else {
+    	log_init_params.sign_key = sg_devInfo.devSerc;
+	}
+	
     IOT_Log_Init_Uploader(&log_init_params);
 #endif
 

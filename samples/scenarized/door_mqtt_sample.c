@@ -35,6 +35,18 @@ static DeviceInfo sg_devInfo;
 static bool sg_has_rev_ack = false;
 
 
+unsigned char bcc_checksum(unsigned char* data, unsigned char len)
+{
+	unsigned char i, result = 0;
+	
+	for (i = 0; i < len; i++) {
+		result ^= data[i];
+		//Log_i("###### data[%d] %c(0x%02x)", (int)i, data[i], data[i]);
+	}
+	return result;
+}
+
+
 void printUsage()
 {
     printf("1. ./door come_home [targetDeviceName]\n");
@@ -114,21 +126,27 @@ static int _setup_connect_init_params(MQTTInitParams* initParams)
 	}
 	Log_i("###### get auth mode %d", authmode);
 
+	ret = HAL_GetDevInfo((void *)&sg_devInfo);
+	Log_i("###### HAL_GetDevInfo ret = %d", ret);
+
 	if (AUTH_MODE_CERT_TLS != authmode)
 	{
-		ret |= HAL_SetProductID("LN19CSVR64");
+		ret = HAL_SetProductID("LN19CSVR64");
 		ret |= HAL_SetDevName("door1");
 		ret |= HAL_SetDevSec("BhKEOITUbhtxU2z7rW+d0Q==");
+		Log_i("###### HAL_Set ret = %d", ret);
 	}
 	else
 	{		
-		ret |= HAL_SetProductID("6SF5233CVA");
+		ret = HAL_SetProductID("6SF5233CVA");
 		ret |= HAL_SetDevName("door1");
 		ret |= HAL_SetDevCertName("door1_cert.crt");
 		ret |= HAL_SetDevPrivateKeyName("door1_private.key");
+		Log_i("###### HAL_Set ret = %d", ret);
 	}
 
-	ret |= HAL_GetDevInfo((void *)&sg_devInfo);
+	ret = HAL_GetDevInfo((void *)&sg_devInfo);
+	Log_i("###### HAL_GetDevInfo ret = %d", ret);
 
 	initParams->product_id = sg_devInfo.product_id;
 	initParams->device_name = sg_devInfo.device_name;
@@ -153,6 +171,8 @@ static int _setup_connect_init_params(MQTTInitParams* initParams)
 	else
 	{	
     	initParams->device_secret = sg_devInfo.devSerc;
+		unsigned char bcc = bcc_checksum((unsigned char*)sg_devInfo.devSerc, strlen(sg_devInfo.devSerc));
+		Log_i("###### bcc 0x%02x", bcc);
 	}
 
 	initParams->command_timeout = QCLOUD_IOT_MQTT_COMMAND_TIMEOUT;
@@ -221,13 +241,15 @@ int main(int argc, char **argv)
         return -1;
     }
 
-	int mode = atoi(argv[2]);
+	DeviceAuthMode mode = 0;
     //init log level
     IOT_Log_Set_Level(DEBUG);
     IOT_Log_Set_MessageHandler(log_handler);
 
     int rc;
 
+	HAL_GetAuthMode(&mode);
+	mode = atoi(argv[2]);
 	HAL_SetAuthMode(mode);
 
     //init connection

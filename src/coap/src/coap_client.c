@@ -121,6 +121,8 @@ void IOT_COAP_Destroy(void **pClient) {
     HAL_Free(*pClient);
     *pClient = NULL;
 
+	iot_device_info_destroy();
+
     Log_i("coap release!");
 }
 
