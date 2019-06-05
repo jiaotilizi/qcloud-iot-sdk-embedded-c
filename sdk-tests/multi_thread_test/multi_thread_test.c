@@ -26,23 +26,10 @@
 #include "qcloud_iot_export.h"
 #include "qcloud_iot_import.h"
 
-/* 产品名称, 与云端同步设备状态时需要  */
-#define QCLOUD_IOT_MY_PRODUCT_ID        	"PRODUCT_ID"
-/* 设备名称, 与云端同步设备状态时需要 */
-#define QCLOUD_IOT_MY_DEVICE_NAME         	"ThreadTestDev0"
-
-
-#ifndef AUTH_WITH_NOTLS
-
-/* 客户端证书文件名  非对称加密使用*/
-#define QCLOUD_IOT_CERT_FILENAME          "YOUR_DEVICE_NAME_cert.crt"
-/* 客户端私钥文件名 非对称加密使用*/
-#define QCLOUD_IOT_KEY_FILENAME           "YOUR_DEVICE_NAME_private.key"
 
 static char sg_cert_file[PATH_MAX + 1];		//客户端证书全路径
 static char sg_key_file[PATH_MAX + 1];		//客户端密钥全路径
 
-#endif
 
 #define MAX_PUB_THREAD_COUNT 3
 #define PUBLISH_COUNT 10
@@ -50,6 +37,8 @@ static char sg_key_file[PATH_MAX + 1];		//客户端密钥全路径
 #define CONNECT_MAX_ATTEMPT_COUNT 3
 #define RX_RECEIVE_PERCENTAGE 99.0f
 #define INTEGRATION_TEST_TOPIC ""QCLOUD_IOT_MY_PRODUCT_ID"/"QCLOUD_IOT_MY_DEVICE_NAME"/Thread"	// 需要创建设备的时候配置权限
+
+static DeviceInfo sg_devInfo;
 
 static void *sg_pClient;
 
@@ -100,27 +89,55 @@ void event_handler(void *pcontext, void *pclient, MQTTEventMsg *msg) {
 
 static int _setup_connect_init_params(MQTTInitParams* initParams)
 {
-	initParams->device_name = QCLOUD_IOT_MY_DEVICE_NAME;
-	initParams->product_id = QCLOUD_IOT_MY_PRODUCT_ID;
+	int ret = 0;
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
 
-#ifndef AUTH_WITH_NOTLS
-	char certs_dir[PATH_MAX + 1] = "certs";
-	char current_path[PATH_MAX + 1];
-	char *cwd = getcwd(current_path, sizeof(current_path));
-	if (cwd == NULL)
+	/* 获取鉴权模式 */
+	ret = HAL_GetAuthMode(&authmode);
+	Log_d("###### HAL_GetAuthMode: mode = %d, ret = %d", authmode, ret);
+
+	if (AUTH_MODE_CERT_TLS != authmode)
 	{
-		Log_e("getcwd return NULL");
-		return QCLOUD_ERR_FAILURE;
+		ret = HAL_SetProductID("LN19CSVR64");
+		ret |= HAL_SetDevName("door1");
+		ret |= HAL_SetDevSec("BhKEOITUbhtxU2z7rW+d0Q==");
 	}
-	sprintf(sg_cert_file, "%s/%s/%s", current_path, certs_dir, QCLOUD_IOT_CERT_FILENAME);
-	sprintf(sg_key_file, "%s/%s/%s", current_path, certs_dir, QCLOUD_IOT_KEY_FILENAME);
+	else
+	{		
+		ret = HAL_SetProductID("6SF5233CVA");
+		ret |= HAL_SetDevName("door1");
+		ret |= HAL_SetDevCertName("door1_cert.crt");
+		ret |= HAL_SetDevPrivateKeyName("door1_private.key");
+	}
+	Log_d("###### HAL_SetDevInfo: ret = %d", ret);
 
-#ifdef AUTH_MODE_CERT
-	initParams->cert_file = sg_cert_file;
-	initParams->key_file = sg_key_file;
-#else
-#endif
-#endif
+	ret = HAL_GetDevInfo((void *)&sg_devInfo);
+	Log_d("###### HAL_GetDevInfo: ret = %d", ret);
+	
+	initParams->product_id = sg_devInfo.product_id;
+	initParams->device_name = sg_devInfo.device_name;
+
+	if (AUTH_MODE_CERT_TLS == authmode)
+	{
+		/* 使用非对称加密*/
+		char certs_dir[PATH_MAX + 1] = "certs";
+		char current_path[PATH_MAX + 1];
+		char *cwd = getcwd(current_path, sizeof(current_path));
+		if (cwd == NULL)
+		{
+			Log_e("getcwd return NULL");
+			return QCLOUD_ERR_FAILURE;
+		}
+		sprintf(sg_cert_file, "%s/%s/%s", current_path, certs_dir, sg_devInfo.devCertFileName);
+		sprintf(sg_key_file, "%s/%s/%s", current_path, certs_dir, sg_devInfo.devPrivateKeyFileName);
+
+		initParams->cert_file = sg_cert_file;
+		initParams->key_file = sg_key_file;
+	}
+	else
+	{	
+    	initParams->device_secret = sg_devInfo.devSerc;
+	}
 
 	initParams->command_timeout = QCLOUD_IOT_MQTT_COMMAND_TIMEOUT;
 	initParams->keep_alive_interval_ms = QCLOUD_IOT_MQTT_KEEP_ALIVE_INTERNAL;
@@ -207,7 +224,7 @@ static void *_iot_mqtt_tests_sub_unsub_thread_runner(void *ptr) {
 	int rc = QCLOUD_ERR_SUCCESS;
 	void *pClient = ptr;
 	char testTopic[128];
-	HAL_Snprintf(testTopic, 128, "%s_temp", INTEGRATION_TEST_TOPIC);
+	HAL_Snprintf(testTopic, 128, "%s/%s/%s_temp", sg_devInfo.product_id, sg_devInfo.device_name, "Thread");
 
 	while(QCLOUD_ERR_SUCCESS == rc && false == sg_terminate_subUnsub_thread) {
 		do {
@@ -228,7 +245,7 @@ static void *_iot_mqtt_tests_sub_unsub_thread_runner(void *ptr) {
 			rc = IOT_MQTT_Unsubscribe(pClient, testTopic);
 		} while(QCLOUD_ERR_MQTT_NO_CONN == rc|| QCLOUD_ERR_MQTT_REQUEST_TIMEOUT == rc);
 
-		if(QCLOUD_ERR_SUCCESS != rc) {
+		if(rc < 0) {
 			Log_e("Unsubscribe Returned : %d ", rc);
 		}
 	}
@@ -242,14 +259,17 @@ static void *_iot_mqtt_tests_sub_unsub_thread_runner(void *ptr) {
 static int _iot_mqtt_tests_subscribe_to_test_topic(void *pClient, QoS qos, struct timeval *pSubscribeTime) {
 	int rc;
 	struct timeval start, end;
+	
+	char testTopic[128];
+	HAL_Snprintf(testTopic, 128, "%s/%s/%s", sg_devInfo.product_id, sg_devInfo.device_name, "Thread");
 
 	gettimeofday(&start, NULL);
 
 	SubscribeParams sub_params = DEFAULT_SUB_PARAMS;
     sub_params.on_message_handler = _iot_mqtt_tests_message_aggregator;
-	rc = IOT_MQTT_Subscribe(pClient, INTEGRATION_TEST_TOPIC, &sub_params);
+	rc = IOT_MQTT_Subscribe(pClient, testTopic, &sub_params);
 
-	printf("\n## Sub response rc : %d|topic : %s\n", rc, INTEGRATION_TEST_TOPIC);
+	printf("\n## Sub response rc : %d|topic : %s\n", rc, testTopic);
 	gettimeofday(&end, NULL);
 
 	timersub(&end, &start, pSubscribeTime);
@@ -272,6 +292,9 @@ static void *_iot_mqtt_tests_publish_thread_runner(void *ptr) {
 	void *pClient = threadData->client;
 	int threadId = threadData->threadId;
 
+	char testTopic[128];
+	HAL_Snprintf(testTopic, 128, "%s/%s/%s", sg_devInfo.product_id, sg_devInfo.device_name, "Thread");
+
 	for(itr = 0; itr < PUBLISH_COUNT; itr++) {
 		snprintf(cPayload, 30, "Thread : %d, Msg : %d", threadId, itr);
 		printf("\nMsg being published: %s \n", cPayload);
@@ -280,19 +303,19 @@ static void *_iot_mqtt_tests_publish_thread_runner(void *ptr) {
 		params.qos = QOS1;
 
 		do {
-			rc = IOT_MQTT_Publish(pClient, INTEGRATION_TEST_TOPIC, &params);
+			rc = IOT_MQTT_Publish(pClient, testTopic, &params);
 			usleep(THREAD_SLEEP_INTERVAL_USEC);
 		} while(/*MUTEX_LOCK_ERROR == rc || */QCLOUD_ERR_MQTT_NO_CONN == rc || QCLOUD_ERR_MQTT_REQUEST_TIMEOUT == rc);
 		
 		// 发布失败的时候进行一次重新发布，并且记录重新发布的次数
-		if(QCLOUD_ERR_SUCCESS != rc) {
+		if(rc < 0) {
 			Log_e("Failed attempt 1 Publishing Thread : %d, Msg : %d, cs : %d ", threadId, itr, rc);
 			do {
-				rc = IOT_MQTT_Publish(pClient, INTEGRATION_TEST_TOPIC, &params);
+				rc = IOT_MQTT_Publish(pClient, testTopic, &params);
 				usleep(THREAD_SLEEP_INTERVAL_USEC);
 			} while(QCLOUD_ERR_MQTT_NO_CONN == rc);
 			sg_rePublishCount++;
-			if(QCLOUD_ERR_SUCCESS != rc) {
+			if(rc < 0) {
 				Log_e("Failed attempt 2 Publishing Thread : %d, Msg : %d, cs : %d Second Attempt ", threadId, itr, rc);
 			}
 		}
@@ -464,5 +487,8 @@ static int _run_thread_test(void)
 }
 
 int main(int argc, char **argv) {
+	/* 设置鉴权模式 */
+	HAL_SetAuthMode(atoi(argv[1]));
+	
 	return _run_thread_test();
 }

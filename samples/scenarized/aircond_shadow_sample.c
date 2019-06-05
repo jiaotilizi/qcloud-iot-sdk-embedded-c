@@ -187,18 +187,13 @@ static void on_message_callback(void *pClient, MQTTMessage *message, void *userD
  */
 static int _setup_connect_init_params(ShadowInitParams* initParams)
 {
-	int ret;
-
+	int ret = 0;
 	DeviceAuthMode authmode = AUTH_MODE_MAX;
 
 	/* 获取鉴权模式 */
-	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
-	{
-		Log_e("get auth mode error!");
-		return QCLOUD_ERR_FAILURE;
-	}
-	Log_i("###### get auth mode %d", authmode);
-	
+	ret = HAL_GetAuthMode(&authmode);
+	Log_d("###### HAL_GetAuthMode: mode = %d, ret = %d", authmode, ret);
+
 	if (AUTH_MODE_CERT_TLS != authmode)
 	{
 		ret |= HAL_SetProductID("DXAJRHTNPE");
@@ -212,8 +207,10 @@ static int _setup_connect_init_params(ShadowInitParams* initParams)
 		ret |= HAL_SetDevCertName("airConditioner1_cert.crt");
 		ret |= HAL_SetDevPrivateKeyName("airConditioner1_private.key");
 	}
+	Log_d("###### HAL_SetDevInfo: ret = %d", ret);
 
-	ret |= HAL_GetDevInfo((void *)&sg_devInfo);
+	ret = HAL_GetDevInfo((void *)&sg_devInfo);
+	Log_d("###### HAL_GetDevInfo: ret = %d", ret);
 	
 	initParams->device_name = sg_devInfo.device_name;
 	initParams->product_id = sg_devInfo.product_id;
@@ -243,7 +240,7 @@ static int _setup_connect_init_params(ShadowInitParams* initParams)
     initParams->auto_connect_enable = 1;
     initParams->event_handle.h_fp = event_handler;
 
-	Log_i("###### HAL_GetDevInfo: product_id %s, device_name %s, device_secret %s, devCertFileName %s, devPrivateKeyFileName %s", 
+	Log_d("###### HAL_GetDevInfo: product_id %s, device_name %s, device_secret %s, devCertFileName %s, devPrivateKeyFileName %s", 
 			sg_devInfo.product_id, sg_devInfo.device_name, sg_devInfo.devSerc, 
 			sg_devInfo.devCertFileName, sg_devInfo.devPrivateKeyFileName);
 

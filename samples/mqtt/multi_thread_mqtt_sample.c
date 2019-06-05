@@ -38,10 +38,10 @@
  * 本示例程序基于Linux pthread环境对MQTT接口函数进行多线程测试，注意该测试设备数据格式应为自定义，非JSON格式
  */
 
-#ifdef AUTH_MODE_CERT
-    static char sg_cert_file[PATH_MAX + 1];      //客户端证书全路径
-    static char sg_key_file[PATH_MAX + 1];       //客户端密钥全路径
-#endif
+
+static char sg_cert_file[PATH_MAX + 1];      //客户端证书全路径
+static char sg_key_file[PATH_MAX + 1];       //客户端密钥全路径
+
 
 static DeviceInfo sg_devInfo;
 
@@ -138,34 +138,55 @@ void event_handler(void *pclient, void *handle_context, MQTTEventMsg *msg) {
 
 static int _setup_connect_init_params(MQTTInitParams* initParams)
 {
-	int ret;
-	
-	ret = HAL_GetDevInfo((void *)&sg_devInfo);	
-	if(QCLOUD_ERR_SUCCESS != ret){
-		return ret;
-	}
-	
-	initParams->device_name = sg_devInfo.device_name;
-	initParams->product_id = sg_devInfo.product_id;
+	int ret = 0;
+	DeviceAuthMode authmode = AUTH_MODE_MAX;
 
-#ifdef AUTH_MODE_CERT
-	/* 使用非对称加密*/
-	char certs_dir[PATH_MAX + 1] = "certs";
-	char current_path[PATH_MAX + 1];
-	char *cwd = getcwd(current_path, sizeof(current_path));
-	if (cwd == NULL)
+	/* 获取鉴权模式 */
+	ret = HAL_GetAuthMode(&authmode);
+	Log_d("###### HAL_GetAuthMode: mode = %d, ret = %d", authmode, ret);
+
+	if (AUTH_MODE_CERT_TLS != authmode)
 	{
-		Log_e("getcwd return NULL");
-		return QCLOUD_ERR_FAILURE;
+		ret = HAL_SetProductID("LN19CSVR64");
+		ret |= HAL_SetDevName("door1");
+		ret |= HAL_SetDevSec("BhKEOITUbhtxU2z7rW+d0Q==");
 	}
-	sprintf(sg_cert_file, "%s/%s/%s", current_path, certs_dir, sg_devInfo.devCertFileName);
-	sprintf(sg_key_file, "%s/%s/%s", current_path, certs_dir, sg_devInfo.devPrivateKeyFileName);
+	else
+	{		
+		ret = HAL_SetProductID("6SF5233CVA");
+		ret |= HAL_SetDevName("door1");
+		ret |= HAL_SetDevCertName("door1_cert.crt");
+		ret |= HAL_SetDevPrivateKeyName("door1_private.key");
+	}
+	Log_d("###### HAL_SetDevInfo: ret = %d", ret);
 
-	initParams->cert_file = sg_cert_file;
-	initParams->key_file = sg_key_file;
-#else
-	initParams->device_secret = sg_devInfo.devSerc;
-#endif
+	ret = HAL_GetDevInfo((void *)&sg_devInfo);
+	Log_d("###### HAL_GetDevInfo: ret = %d", ret);
+	
+	initParams->product_id = sg_devInfo.product_id;
+	initParams->device_name = sg_devInfo.device_name;
+
+	if (AUTH_MODE_CERT_TLS == authmode)
+	{
+		/* 使用非对称加密*/
+		char certs_dir[PATH_MAX + 1] = "certs";
+		char current_path[PATH_MAX + 1];
+		char *cwd = getcwd(current_path, sizeof(current_path));
+		if (cwd == NULL)
+		{
+			Log_e("getcwd return NULL");
+			return QCLOUD_ERR_FAILURE;
+		}
+		sprintf(sg_cert_file, "%s/%s/%s", current_path, certs_dir, sg_devInfo.devCertFileName);
+		sprintf(sg_key_file, "%s/%s/%s", current_path, certs_dir, sg_devInfo.devPrivateKeyFileName);
+
+		initParams->cert_file = sg_cert_file;
+		initParams->key_file = sg_key_file;
+	}
+	else
+	{	
+    	initParams->device_secret = sg_devInfo.devSerc;
+	}
 
     memset(sg_integeration_test_topic, 0, MAX_SIZE_OF_TOPIC_CONTENT);	
 	sprintf(sg_integeration_test_topic, "%s/%s/data", sg_devInfo.product_id, sg_devInfo.device_name);
@@ -485,7 +506,10 @@ static int _mqtt_multi_thread_test(void* client)
 
 int main(int argc, char **argv) {
     int rc;
-    
+
+	/* 设置鉴权模式 */
+	HAL_SetAuthMode(atoi(argv[1]));
+	
     //Init log level
     IOT_Log_Set_Level(DEBUG);
 

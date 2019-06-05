@@ -119,22 +119,14 @@ static int _setup_connect_init_params(MQTTInitParams* initParams)
 	DeviceAuthMode authmode = AUTH_MODE_MAX;
 
 	/* 获取鉴权模式 */
-	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) 
-	{
-		Log_e("get auth mode error!");
-		return QCLOUD_ERR_FAILURE;
-	}
-	Log_i("###### get auth mode %d", authmode);
-
-	ret = HAL_GetDevInfo((void *)&sg_devInfo);
-	Log_i("###### HAL_GetDevInfo ret = %d", ret);
+	ret = HAL_GetAuthMode(&authmode);
+	Log_d("###### HAL_GetAuthMode: mode = %d, ret = %d", authmode, ret);
 
 	if (AUTH_MODE_CERT_TLS != authmode)
 	{
 		ret = HAL_SetProductID("LN19CSVR64");
 		ret |= HAL_SetDevName("door1");
 		ret |= HAL_SetDevSec("BhKEOITUbhtxU2z7rW+d0Q==");
-		Log_i("###### HAL_Set ret = %d", ret);
 	}
 	else
 	{		
@@ -142,11 +134,11 @@ static int _setup_connect_init_params(MQTTInitParams* initParams)
 		ret |= HAL_SetDevName("door1");
 		ret |= HAL_SetDevCertName("door1_cert.crt");
 		ret |= HAL_SetDevPrivateKeyName("door1_private.key");
-		Log_i("###### HAL_Set ret = %d", ret);
 	}
+	Log_d("###### HAL_SetDevInfo: ret = %d", ret);
 
 	ret = HAL_GetDevInfo((void *)&sg_devInfo);
-	Log_i("###### HAL_GetDevInfo ret = %d", ret);
+	Log_d("###### HAL_GetDevInfo: ret = %d", ret);
 
 	initParams->product_id = sg_devInfo.product_id;
 	initParams->device_name = sg_devInfo.device_name;
@@ -172,7 +164,7 @@ static int _setup_connect_init_params(MQTTInitParams* initParams)
 	{	
     	initParams->device_secret = sg_devInfo.devSerc;
 		unsigned char bcc = bcc_checksum((unsigned char*)sg_devInfo.devSerc, strlen(sg_devInfo.devSerc));
-		Log_i("###### bcc 0x%02x", bcc);
+		Log_d("###### bcc 0x%02x", bcc);
 	}
 
 	initParams->command_timeout = QCLOUD_IOT_MQTT_COMMAND_TIMEOUT;
@@ -180,11 +172,11 @@ static int _setup_connect_init_params(MQTTInitParams* initParams)
 	initParams->auto_connect_enable = 1;
     initParams->event_handle.h_fp = event_handler;
 	
-	Log_i("###### product_id %s, device_name %s, device_secret %s", 
+	Log_d("###### product_id %s, device_name %s, device_secret %s", 
 			initParams->product_id, initParams->device_name, initParams->device_secret);
 
 	
-	Log_i("###### HAL_GetDevInfo: product_id %s, device_name %s, device_secret %s, devCertFileName %s, devPrivateKeyFileName %s", 
+	Log_d("###### HAL_GetDevInfo: product_id %s, device_name %s, device_secret %s, devCertFileName %s, devPrivateKeyFileName %s", 
 			sg_devInfo.product_id, sg_devInfo.device_name, sg_devInfo.devSerc, 
 			sg_devInfo.devCertFileName, sg_devInfo.devPrivateKeyFileName);
 	
@@ -241,16 +233,12 @@ int main(int argc, char **argv)
         return -1;
     }
 
-	DeviceAuthMode mode = 0;
     //init log level
     IOT_Log_Set_Level(DEBUG);
     IOT_Log_Set_MessageHandler(log_handler);
 
     int rc;
-
-	HAL_GetAuthMode(&mode);
-	mode = atoi(argv[2]);
-	HAL_SetAuthMode(mode);
+	HAL_SetAuthMode(atoi(argv[2]));
 
     //init connection
     MQTTInitParams init_params = DEFAULT_MQTTINIT_PARAMS;
@@ -265,17 +253,6 @@ int main(int argc, char **argv)
         Log_i("Cloud Device Construct Success");
     } else {
         Log_e("Cloud Device Construct Failed");
-        return QCLOUD_ERR_FAILURE;
-    }
-
-	rc = IOT_MQTT_Destroy(&client);
-	Log_i("### IOT_MQTT_Destroy rc = %d", rc);
-
-	client = IOT_MQTT_Construct(&init_params);
-    if (client != NULL) {
-        Log_i("### Cloud Device Construct Success");
-    } else {
-        Log_e("### Cloud Device Construct Failed");
         return QCLOUD_ERR_FAILURE;
     }
 

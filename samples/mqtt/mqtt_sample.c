@@ -139,27 +139,26 @@ static int _setup_connect_init_params(MQTTInitParams* initParams)
 	DeviceAuthMode authmode = AUTH_MODE_MAX;
 
 	/* 获取鉴权模式 */
-	if (QCLOUD_ERR_SUCCESS != HAL_GetAuthMode(&authmode)) {
-		Log_e("get auth mode error!");
-		return QCLOUD_ERR_FAILURE;
-	}
-	Log_i("###### get auth mode %d", authmode);
+	ret = HAL_GetAuthMode(&authmode);
+	Log_d("###### HAL_GetAuthMode: mode = %d, ret = %d", authmode, ret);
 
-	if (AUTH_MODE_CERT_TLS != authmode) {
-		ret |= HAL_SetProductID("LN19CSVR64");
+	if (AUTH_MODE_CERT_TLS != authmode)
+	{
+		ret = HAL_SetProductID("LN19CSVR64");
 		ret |= HAL_SetDevName("door1");
 		ret |= HAL_SetDevSec("BhKEOITUbhtxU2z7rW+d0Q==");
-	} else {		
-		ret |= HAL_SetProductID("6SF5233CVA");
+	}
+	else
+	{		
+		ret = HAL_SetProductID("6SF5233CVA");
 		ret |= HAL_SetDevName("door1");
 		ret |= HAL_SetDevCertName("door1_cert.crt");
 		ret |= HAL_SetDevPrivateKeyName("door1_private.key");
 	}
-	
-	ret |= HAL_GetDevInfo((void *)&sg_devInfo);	
-	if (QCLOUD_ERR_SUCCESS != ret) {
-		return ret;
-	}
+	Log_d("###### HAL_SetDevInfo: ret = %d", ret);
+
+	ret = HAL_GetDevInfo((void *)&sg_devInfo);
+	Log_d("###### HAL_GetDevInfo: ret = %d", ret);
 	
 	initParams->device_name = sg_devInfo.device_name;
 	initParams->product_id = sg_devInfo.product_id;
@@ -190,7 +189,7 @@ static int _setup_connect_init_params(MQTTInitParams* initParams)
 	initParams->event_handle.h_fp = event_handler;
 	initParams->event_handle.context = NULL;
 
-	Log_i("###### HAL_GetDevInfo: product_id %s, device_name %s, device_secret %s, devCertFileName %s, devPrivateKeyFileName %s", 
+	Log_d("###### HAL_GetDevInfo: product_id %s, device_name %s, device_secret %s, devCertFileName %s, devPrivateKeyFileName %s", 
 			sg_devInfo.product_id, sg_devInfo.device_name, sg_devInfo.devSerc, 
 			sg_devInfo.devCertFileName, sg_devInfo.devPrivateKeyFileName);
 
