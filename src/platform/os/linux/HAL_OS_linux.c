@@ -34,8 +34,8 @@
 
 /* 产品名称, 与云端同步设备状态时需要  */
 static char sg_product_id[MAX_SIZE_OF_PRODUCT_ID + 1]	 = "PRODUCT_ID";
-/* 产品密钥, 与云端同步设备状态时需要  */
-static char sg_product_key[MAX_SIZE_OF_PRODUCT_KEY + 1]  = "YOUR_PRODUCT_KEY";
+/* 产品密钥, 若使能动态注册功能，控制台生成，必填。若不使能，则不用赋值  */
+static char sg_product_secret[MAX_SIZE_OF_PRODUCT_KEY + 1]  = "YOUR_PRODUCT_SECRET";
 /* 设备名称, 与云端同步设备状态时需要 */
 static char sg_device_name[MAX_SIZE_OF_DEVICE_NAME + 1]  = "YOUR_DEVICE_NAME";
 
@@ -271,12 +271,12 @@ int HAL_GetProductID(char *pProductId, uint8_t maxlen)
 int HAL_GetProductKey(char *pProductKey, uint8_t maxlen)
 {
 #ifdef DEBUG_DEV_INFO_USED
-	if(strlen(sg_product_key) > maxlen){
+	if(strlen(sg_product_secret) > maxlen){
 		return QCLOUD_ERR_FAILURE;
 	}
 
 	memset(pProductKey, '\0', maxlen);
-	strncpy(pProductKey, sg_product_key, maxlen);
+	strncpy(pProductKey, sg_product_secret, maxlen);
 
 	return QCLOUD_ERR_SUCCESS;
 #else
@@ -383,8 +383,8 @@ int HAL_SetProductKey(const char *pProductKey)
 		return QCLOUD_ERR_FAILURE;
 	}
 
-	memset(sg_product_key, '\0', MAX_SIZE_OF_PRODUCT_KEY);
-	strncpy(sg_product_key, pProductKey, MAX_SIZE_OF_PRODUCT_KEY);
+	memset(sg_product_secret, '\0', MAX_SIZE_OF_PRODUCT_KEY);
+	strncpy(sg_product_secret, pProductKey, MAX_SIZE_OF_PRODUCT_KEY);
 
 	return QCLOUD_ERR_SUCCESS;
 #else
