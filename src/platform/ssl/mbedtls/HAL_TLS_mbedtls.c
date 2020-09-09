@@ -117,15 +117,46 @@ static int _mbedtls_client_init(TLSDataParams *pDataParams, TLSConnectParams *pC
 	if (AUTH_MODE_CERT_TLS == authmode)
 	{
 	    if (pConnectParams->cert_file != NULL && pConnectParams->key_file != NULL) {
-	            if ((ret = mbedtls_x509_crt_parse_file(&(pDataParams->client_cert), pConnectParams->cert_file)) != 0) {
+			uint32_t 		data_length = 0;
+            unsigned char* 	data_buffer = NULL;
+		
+			if (HAL_ReadFromFile(pConnectParams->cert_file, &data_buffer, &data_length) != true) {
+				Log_e("parse file %s to string error", pConnectParams->cert_file);
+                return QCLOUD_ERR_SSL_CERT;
+            } else {
+                data_length += 1;
+            }
+	        if ((ret = mbedtls_x509_crt_parse(&(pDataParams->client_cert), (const unsigned char *)data_buffer, data_length)) != 0) {
 	            Log_e("load client cert file failed returned 0x%x", ret<0?-ret:ret);
+				if (NULL != data_buffer) {
+					HAL_Free(data_buffer);
+					data_buffer = NULL;
+				}
 	            return QCLOUD_ERR_SSL_CERT;
 	        }
+			if (NULL != data_buffer) {
+				HAL_Free(data_buffer);
+				data_buffer = NULL;
+			}
 
-	        if ((ret = mbedtls_pk_parse_keyfile(&(pDataParams->private_key), pConnectParams->key_file, "")) != 0) {
+			if (HAL_ReadFromFile(pConnectParams->key_file, &data_buffer, &data_length) != true) {
+				Log_e("parse file %s to string error", pConnectParams->key_file);
+                return QCLOUD_ERR_SSL_CERT;
+            } else {
+                data_length += 1;
+            }
+	        if ((ret = mbedtls_pk_parse_key(&(pDataParams->private_key), (const unsigned char *)data_buffer, data_length, NULL, 0)) != 0) {
 	            Log_e("load client key file failed returned 0x%x", ret<0?-ret:ret);
+				if (NULL != data_buffer) {
+					HAL_Free(data_buffer);
+					data_buffer = NULL;
+				}
 	            return QCLOUD_ERR_SSL_CERT;
 	        }
+			if (NULL != data_buffer) {
+				HAL_Free(data_buffer);
+				data_buffer = NULL;
+			}
 	    } else {
 	        Log_d("cert_file/key_file is empty!|cert_file=%s|key_file=%s", pConnectParams->cert_file, pConnectParams->key_file);
 	    }

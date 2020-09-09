@@ -336,7 +336,11 @@ int qcloud_iot_mqtt_pub_info_proc(Qcloud_IoT_Client *pClient)
                 /* 通知外部网络已经断开 */
             if (NULL != pClient->event_handle.h_fp) {
                 MQTTEventMsg msg;
-                msg.event_type = MQTT_EVENT_PUBLISH_TIMEOUT;
+				if (0 == repubInfo->pubfrom) {
+                	msg.event_type = MQTT_EVENT_PUBLISH_TIMEOUT;
+				} else {
+					msg.event_type = MQTT_EVENT_PUBLISHX_TIMEOUT;
+				}
                 msg.msg = (void *)(uintptr_t)repubInfo->msg_id;
                 pClient->event_handle.h_fp(pClient, pClient->event_handle.context, &msg);
             }

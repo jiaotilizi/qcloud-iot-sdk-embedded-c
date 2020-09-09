@@ -23,8 +23,11 @@ extern "C" {
     
 int qcloud_iot_coap_network_init(Network *pNetwork)
 {
-    int rc;
+    int rc = -1;
+	
+#ifdef COAP_COMM_ENABLED
     rc = utils_udp_net_init(pNetwork);
+#endif
 
     return rc;
 }

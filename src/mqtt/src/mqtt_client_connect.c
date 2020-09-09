@@ -164,7 +164,7 @@ static int _serialize_connect_packet(unsigned char *buf, size_t buf_len, MQTTCon
         IOT_FUNC_EXIT_RC(QCLOUD_ERR_BUF_TOO_SHORT);
     }
 
-    rc = mqtt_init_packet_header(&header, CONNECT, QOS0, 0, 0);
+    rc = mqtt_init_packet_header(&header, CONNECT, TC_QOS0, 0, 0);
     if (QCLOUD_ERR_SUCCESS != rc) {
         IOT_FUNC_EXIT_RC(rc);
     }

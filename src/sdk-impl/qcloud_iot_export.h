@@ -65,10 +65,10 @@ extern "C" {
 
 
 /* MQTT消息发送buffer大小, 支持最大256*1024 */
-#define QCLOUD_IOT_MQTT_TX_BUF_LEN                                  (2048)
+#define QCLOUD_IOT_MQTT_TX_BUF_LEN                                  (10240)
 
 /* MQTT消息接收buffer大小, 支持最大256*1024 */
-#define QCLOUD_IOT_MQTT_RX_BUF_LEN                                  (2048)
+#define QCLOUD_IOT_MQTT_RX_BUF_LEN                                  (10240)
 
 /* COAP 发送消息buffer大小，最大支持64*1024字节 */
 #define COAP_SENDMSG_MAX_BUFLEN                   					(512)
@@ -98,9 +98,7 @@ typedef struct {
 	
 	char	devSerc[MAX_SIZE_OF_DEVICE_SERC + 1];							/* AUTH_MODE_KEY_NO_TLS/AUTH_MODE_KEY_TLS 模式使用 */
 
-#ifdef DEV_DYN_REG_ENABLED
-	char	product_key[MAX_SIZE_OF_PRODUCT_KEY + 1];
-#endif  	
+	char	product_key[MAX_SIZE_OF_PRODUCT_KEY + 1]; 	
 } DeviceInfo;
 
 #include "qcloud_iot_export_coap.h"

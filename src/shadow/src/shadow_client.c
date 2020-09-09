@@ -56,7 +56,7 @@ static inline int _check_snprintf_return(int32_t returnCode, size_t maxSizeOfWri
 static void _shadow_event_handler(void *pclient, void *context, MQTTEventMsg *msg) {
 	uintptr_t packet_id = (uintptr_t)msg->msg;
 	Qcloud_IoT_Shadow *shadow_client = (Qcloud_IoT_Shadow *)context;
-	MQTTMessage* topic_info = (MQTTMessage*)msg->msg;
+	MQTTMessage_S* topic_info = (MQTTMessage_S*)msg->msg;
 
 	switch (msg->event_type) {
 		case MQTT_EVENT_SUBCRIBE_SUCCESS:

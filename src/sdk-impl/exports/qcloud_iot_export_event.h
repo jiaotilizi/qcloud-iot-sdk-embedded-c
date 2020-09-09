@@ -96,7 +96,7 @@ typedef struct  _sEvent_{
  *
  */
 
-typedef void (*OnEventReplyCallback)(void *pClient,  MQTTMessage *messag);
+typedef void (*OnEventReplyCallback)(void *pClient,  MQTTMessage_S *messag);
 
 typedef struct _sReply_{
     char       client_token[EVENT_TOKEN_MAX_LEN];               // 标识该请求的clientToken字段

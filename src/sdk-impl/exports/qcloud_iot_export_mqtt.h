@@ -30,9 +30,9 @@ extern "C" {
  * 服务质量等级表示PUBLISH消息分发的质量等级
  */
 typedef enum _QoS {
-    QOS0 = 0,    // 至多分发一次
-    QOS1 = 1,    // 至少分发一次, 消息的接收者需回复PUBACK报文
-    QOS2 = 2     // 仅分发一次, 目前腾讯物联云不支持该等级
+    TC_QOS0 = 0,    // 至多分发一次
+    TC_QOS1 = 1,    // 至少分发一次, 消息的接收者需回复PUBACK报文
+    TC_QOS2 = 2     // 仅分发一次, 目前腾讯物联云不支持该等级
 } QoS;
 
 /**
@@ -41,6 +41,7 @@ typedef enum _QoS {
 typedef struct {
     QoS         			qos;          // MQTT 服务质量等级
     uint8_t     			retained;     // RETAIN 标识位
+    uint8_t                 pubfrom;      // 0 - MQTTPUB / 1 - MQTTPUBL
     uint8_t     			dup;          // DUP 标识位
     uint16_t    			id;           // MQTT 消息标识符
 
@@ -49,11 +50,11 @@ typedef struct {
 
     void        			*payload;     // MQTT 消息负载
     size_t      			payload_len;  // MQTT 消息负载长度
-} MQTTMessage;
+} MQTTMessage_S;
 
-typedef MQTTMessage PublishParams;
+typedef MQTTMessage_S PublishParams;
 
-#define DEFAULT_PUB_PARAMS {QOS0, 0, 0, 0, NULL, 0, NULL, 0}
+#define DEFAULT_PUB_PARAMS {TC_QOS0, 0, 0, 0, 0, NULL, 0, NULL, 0}
 
 typedef enum {
 
@@ -102,12 +103,21 @@ typedef enum {
     /* 取消订阅 */
     MQTT_EVENT_UNSUBSCRIBE = 14,
 
+	/* 发布长主题成功 */
+    MQTT_EVENT_PUBLISHX_SUCCESS = 15,
+
+    /* 发布长主题超时 */
+    MQTT_EVENT_PUBLISHX_TIMEOUT = 16,
+
+	/* 发布长主题失败 */
+    MQTT_EVENT_PUBLISHX_NACK = 17,
+
 } MQTTEventType;
 
 /**
  * @brief MQTT SUBSCRIBE 消息回调处理函数指针定义
  */
-typedef void (*OnMessageHandler)(void *pClient, MQTTMessage *message, void *pUserData);
+typedef void (*OnMessageHandler)(void *pClient, MQTTMessage_S *message, void *pUserData);
 
 /**
  * @brief MQTT SUBSCRIBE 事件回调处理函数指针定义
@@ -127,7 +137,7 @@ typedef struct {
 /**
  * MQTT 订阅报文默认参数
  */
-#define DEFAULT_SUB_PARAMS {QOS0, NULL, NULL, NULL}
+#define DEFAULT_SUB_PARAMS {TC_QOS0, NULL, NULL, NULL}
 
 
 typedef struct {

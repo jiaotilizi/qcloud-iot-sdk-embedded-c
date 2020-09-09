@@ -38,7 +38,7 @@ static SysMQTTState sg_state = {
             .time = 0};
 
 
-static void _system_mqtt_message_callback(void *pClient, MQTTMessage *message, void *pUserData)
+static void _system_mqtt_message_callback(void *pClient, MQTTMessage_S *message, void *pUserData)
 {
 #define MAX_RECV_LEN (512)
 
@@ -112,7 +112,7 @@ static int _iot_system_info_get_publish(void *pClient)
     HAL_Snprintf(payload_content, sizeof(payload_content), "{\"type\": \"get\", \"resource\": [\"time\"]}");
 
     PublishParams pub_params = DEFAULT_PUB_PARAMS;
-    pub_params.qos = QOS0;
+    pub_params.qos = TC_QOS0;
     pub_params.payload = payload_content;
     pub_params.payload_len = strlen(payload_content);
 
@@ -137,7 +137,7 @@ static int _iot_system_info_result_subscribe(void *pClient)
     sub_params.on_message_handler = _system_mqtt_message_callback;
     sub_params.on_sub_event_handler = _system_mqtt_sub_event_handler;
     sub_params.user_data = (void *)&sg_state;
-    sub_params.qos = QOS0;
+    sub_params.qos = TC_QOS0;
 
     return IOT_MQTT_Subscribe(pClient, topic_name, &sub_params);
 }

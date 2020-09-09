@@ -39,14 +39,14 @@ static int _qcloud_otalib_get_firmware_fixlen_para(const char *json_doc, const c
 
     int ret = QCLOUD_ERR_SUCCESS;
 
-    char* key_bak = HAL_Malloc(strlen(key));
+    char *key_bak = HAL_Malloc(strlen(key) + 1);
     if (key_bak == NULL) {
     	Log_e("not enough memory for malloc key");
     	ret = IOT_OTA_ERR_FAIL;
     	IOT_FUNC_EXIT_RC(ret);
     }
 
-    char* json_doc_bak = HAL_Malloc(strlen(json_doc));
+    char *json_doc_bak = HAL_Malloc(strlen(json_doc) + 1);
     if (json_doc_bak == NULL) {
     	Log_e("not enough memory for malloc json");
     	HAL_Free(key_bak);
@@ -97,14 +97,14 @@ static int _qcloud_otalib_get_firmware_varlen_para(const char *json_doc, const c
 
     int ret = QCLOUD_ERR_SUCCESS;
 
-    char* key_bak = HAL_Malloc(strlen(key));
+    char *key_bak = HAL_Malloc(strlen(key) + 1);
     if (key_bak == NULL) {
     	Log_e("not enough memory for malloc key");
     	ret = IOT_OTA_ERR_FAIL;
     	IOT_FUNC_EXIT_RC(ret);
     }
 
-    char* json_doc_bak = HAL_Malloc(strlen(json_doc));
+    char *json_doc_bak = HAL_Malloc(strlen(json_doc) + 1);
     if (json_doc_bak == NULL) {
     	Log_e("not enough memory for malloc json");
     	HAL_Free(key_bak);
@@ -184,9 +184,13 @@ int qcloud_otalib_get_report_version_result(const char *json)
 
     int rc = _qcloud_otalib_get_firmware_varlen_para(json, RESULT_FIELD, &result_code);
     if ( rc != QCLOUD_ERR_SUCCESS || strcmp(result_code, "0") != 0) {
+        if (NULL != result_code)
+            HAL_Free(result_code);
         IOT_FUNC_EXIT_RC(IOT_OTA_ERR_FAIL);
     }
 
+    if (NULL != result_code)
+        HAL_Free(result_code);
     IOT_FUNC_EXIT_RC(QCLOUD_ERR_SUCCESS);
 }
 
@@ -197,7 +201,7 @@ int qcloud_otalib_get_params(const char *json, char **type, char **url, char **v
 
     IOT_FUNC_ENTRY;
 
-    char file_size_str[OTA_FILESIZE_STR_LEN + 1];
+    char file_size_str[OTA_FILESIZE_STR_LEN + 1] = "";
 
     /* get type */
     if (0 != _qcloud_otalib_get_firmware_varlen_para(json, TYPE_FIELD, type)) {

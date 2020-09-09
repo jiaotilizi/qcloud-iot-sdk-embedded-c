@@ -78,7 +78,7 @@ void srand_d(unsigned int i)
 
 
 static int _get_json_resault_code(char *json) {
-	int resault = -1;
+	int32_t resault = -1;
 	char *v = LITE_json_value_of(CODE_RESAULT, json);
 	
 	if (v == NULL) {
@@ -98,7 +98,7 @@ static int _get_json_resault_code(char *json) {
 }
 
 static int _get_json_encry_type(char *json) {
-	int type = -1;
+	int32_t type = -1;
 	char *v = LITE_json_value_of(ENCRYPT_TYPE, json);
 	
 	if (v == NULL) {
@@ -173,7 +173,7 @@ static int _cert_file_save(const char *fileName, char *data,	uint32_t dataLen)
 
 
 	memset(filePath, 0, FILE_PATH_MAX_LEN);
-	HAL_Snprintf(filePath, FILE_PATH_MAX_LEN, "./certs/%s", fileName);
+	HAL_Snprintf(filePath, FILE_PATH_MAX_LEN, "/%s", fileName);
 
     if( ( fp = fopen(filePath, "w+" ) ) == NULL ) {
         Log_e("fail to open file %s", fileName);
@@ -304,7 +304,7 @@ static int _parse_devinfo(char *jdoc, DeviceInfo *pDevInfo)
 		clientCert = _get_json_cert_data(decodeBuff_cert);
 		if(NULL != clientCert){
 			memset(pDevInfo->devCertFileName, 0, MAX_SIZE_OF_DEVICE_CERT_FILE_NAME);
-			HAL_Snprintf(pDevInfo->devCertFileName, MAX_SIZE_OF_DEVICE_CERT_FILE_NAME, "%s_cert.crt", pDevInfo->device_name);
+			HAL_Snprintf(pDevInfo->devCertFileName, MAX_SIZE_OF_DEVICE_CERT_FILE_NAME, "%s.crt", pDevInfo->device_name);
 			if(QCLOUD_ERR_SUCCESS != _cert_file_save(pDevInfo->devCertFileName, clientCert,	strlen(clientCert))){
 				Log_e("save %s file fail", pDevInfo->devCertFileName);
 				ret = QCLOUD_ERR_FAILURE;
@@ -320,7 +320,7 @@ static int _parse_devinfo(char *jdoc, DeviceInfo *pDevInfo)
 		clientKey = _get_json_key_data(decodeBuff_cert);
 		if(NULL != clientKey){
 			memset(pDevInfo->devPrivateKeyFileName, 0, MAX_SIZE_OF_DEVICE_KEY_FILE_NAME);
-			HAL_Snprintf(pDevInfo->devPrivateKeyFileName, MAX_SIZE_OF_DEVICE_KEY_FILE_NAME, "%s_private.key", pDevInfo->device_name);
+			HAL_Snprintf(pDevInfo->devPrivateKeyFileName, MAX_SIZE_OF_DEVICE_KEY_FILE_NAME, "%s.key", pDevInfo->device_name);
 			if(QCLOUD_ERR_SUCCESS != _cert_file_save(pDevInfo->devPrivateKeyFileName, clientKey,	strlen(clientKey))){
 				Log_e("save %s file fail", pDevInfo->devPrivateKeyFileName);
 				ret = QCLOUD_ERR_FAILURE;

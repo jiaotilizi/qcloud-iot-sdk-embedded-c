@@ -19,6 +19,8 @@
  * Edit by shockcao@tencent.com 2018/3/15
  */
 
+//#include "inttypes.h"
+
 #include "json_parser.h"
 
 #include "lite-utils.h"
@@ -132,27 +134,27 @@ void LITE_json_keys_release(list_head_t *keylist)
 }
 
 int LITE_get_int32(int32_t *value, char *src) {
-	return (sscanf(src, "%" SCNi32, value) == 1) ? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
+	return (sscanf(src, "%" PRIi32, value) == 1) ? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
 }
 
 int LITE_get_int16(int16_t *value, char *src) {
-	return (sscanf(src, "%" SCNi16, value) == 1) ? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
+	return (sscanf(src, "%" PRIi16, value) == 1) ? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
 }
 
 int LITE_get_int8(int8_t *value, char *src) {
-	return (sscanf(src, "%" SCNi8, value) == 1) ? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
+	return (sscanf(src, "%" PRIi8, value) == 1) ? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
 }
 
 int LITE_get_uint32(uint32_t *value, char *src) {
-	return (sscanf(src, "%" SCNu32, value) == 1) ? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
+	return (sscanf(src, "%" PRIu32, value) == 1) ? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
 }
 
 int LITE_get_uint16(uint16_t *value, char *src) {
-	return (sscanf(src, "%" SCNu16, value) == 1) ? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
+	return (sscanf(src, "%" PRIu16, value) == 1) ? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
 }
 
 int LITE_get_uint8(uint8_t *value, char *src) {
-	return (sscanf(src, "%" SCNu8, value) == 1) ? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
+	return (sscanf(src, "%" PRIu8, value) == 1) ? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
 }
 
 int LITE_get_float(float *value, char *src) {

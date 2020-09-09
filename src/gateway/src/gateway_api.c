@@ -15,7 +15,7 @@ void _gateway_event_handler(void *client, void *context, MQTTEventMsg *msg)
 
 	POINTER_SANITY_CHECK_RTN(context);
 	POINTER_SANITY_CHECK_RTN(msg);
-	MQTTMessage* topic_info = (MQTTMessage*)msg->msg;
+	MQTTMessage_S* topic_info = (MQTTMessage_S*)msg->msg;
     
 	switch (msg->event_type) {
 		case MQTT_EVENT_SUBCRIBE_SUCCESS:
@@ -161,7 +161,7 @@ int IOT_Gateway_Subdev_Online(void *client, GatewayParam* param)
 	}
 	gateway->gateway_data.online.result = -1;
 
-	params.qos = QOS0;
+	params.qos = TC_QOS0;
 	params.payload_len = strlen(payload);
 	params.payload = (char *) payload;
 
@@ -234,7 +234,7 @@ int IOT_Gateway_Subdev_Offline(void *client, GatewayParam* param)
 
 
 	PublishParams params = DEFAULT_PUB_PARAMS;
-	params.qos = QOS0;
+	params.qos = TC_QOS0;
 	params.payload_len = strlen(payload);
 	params.payload = (char *) payload;
 

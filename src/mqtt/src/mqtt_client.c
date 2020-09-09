@@ -250,7 +250,7 @@ int qcloud_iot_mqtt_init(Qcloud_IoT_Client *pClient, MQTTInitParams *pParams) {
         pClient->sub_handles[i].topic_filter = NULL;
         pClient->sub_handles[i].message_handler = NULL;
         pClient->sub_handles[i].sub_event_handler = NULL;
-        pClient->sub_handles[i].qos = QOS0;
+        pClient->sub_handles[i].qos = TC_QOS0;
         pClient->sub_handles[i].handler_user_data = NULL;
     }
 

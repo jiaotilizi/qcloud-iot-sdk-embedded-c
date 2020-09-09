@@ -57,6 +57,10 @@ extern "C" {
 /* 云端保留主题的最大长度 */
 #define MAX_SIZE_OF_CLOUD_TOPIC                                     ((MAX_SIZE_OF_DEVICE_NAME) + (MAX_SIZE_OF_PRODUCT_ID) + 64 + 6)
 
+/* 打开用于防止QoS1主题重复接收消息 */
+#define MQTT_RMDUP_MSG_ENABLED
+
+
 /**
  * @brief MQTT Message Type
  */
@@ -114,7 +118,7 @@ typedef struct {
 /**
  * MQTT遗嘱消息结构体默认值定义
  */
-#define DEFAULT_WILL_OPTIONS { {'M', 'Q', 'T', 'W'}, 0, NULL, NULL, 0, QOS0 }
+#define DEFAULT_WILL_OPTIONS { {'M', 'Q', 'T', 'W'}, 0, NULL, NULL, 0, TC_QOS0 }
 
 /**
  * @brief MQTT 连接参数结构体定义
@@ -216,6 +220,7 @@ typedef struct REPUBLISH_INFO {
     Timer                   pub_start_time;     /* 发布的时间 */
     MQTTNodeState           node_state;         /* 节点状态 */
     uint16_t                msg_id;             /* 发布消息的packet id */
+	uint8_t                 pubfrom;            // 0 - MQTTPUB / 1 - MQTTPUBL
     uint32_t                len;                /* 消息长度 */
     unsigned char          *buf;                /* 消息内容 */
 } QcloudIotPubInfo;

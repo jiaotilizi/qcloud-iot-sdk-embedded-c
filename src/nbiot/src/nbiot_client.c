@@ -9,7 +9,7 @@
 
 #define MAX_SIZE_DATA     1024
 #define MAX_SIZE_TOKEN    1024
-#define DECODE_PSK_LENGTH 48	/*¿ØÖÆÌ¨ÔÊÐíµÄ×î´ó³¤¶ÈÎª64£¬¶ÔÓ¦µ½Ô­ÎÄ×î´ó³¤¶È64/4*3 = 48*/
+#define DECODE_PSK_LENGTH 48	/*æŽ§åˆ¶å°å…è®¸çš„æœ€å¤§é•¿åº¦ä¸º64ï¼Œå¯¹åº”åˆ°åŽŸæ–‡æœ€å¤§é•¿åº¦64/4*3 = 48*/
 
 #define ADDRESS_SIZE   1
 #define LENGTH_SIZE    2
@@ -83,11 +83,11 @@ void StrToHex(char *pbDest, char *pbSrc, int nLen)
     {
         h1 = pbSrc[2*i];
         h2 = pbSrc[2*i + 1];
-        s1 = toupper(h1) - 0x30;
+        s1 = toupper((int)h1) - 0x30;
         if (s1 > 9)
            s1 -= 7;
 
-        s2 = toupper(h2) - 0x30;
+        s2 = toupper((int)h2) - 0x30;
         if (s2 > 9)
             s2 -= 7;
 
@@ -118,13 +118,13 @@ int calToken(char* token, int* tokenSize, const unsigned char* keyBase64, char* 
     strncat(buffer, semicolon, sizeof(char));
     //Log_d("buffer = %s, len = %ld", buffer, strlen(buffer));
 
-    sprintf(bufferTemp, "%u", expiry);
+    sprintf(bufferTemp, "%lu", expiry);
     //Log_d("bufferTemp = %s", bufferTemp);
     strncat(buffer, bufferTemp, strlen(bufferTemp));
     strncat(buffer, semicolon, sizeof(char));
     //Log_d("buffer = %s, len = %ld", buffer, strlen(buffer));
 
-    sprintf(bufferTemp, "%u", seq);
+    sprintf(bufferTemp, "%lu", seq);
     strncat(buffer, bufferTemp, sizeof(char)*4);
     strncat(buffer, semicolon, sizeof(char));
     //Log_d("buffer = %s, len = %ld", buffer, strlen(buffer));

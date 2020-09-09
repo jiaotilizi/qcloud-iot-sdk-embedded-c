@@ -68,9 +68,9 @@ static int _otamqtt_publish(OTA_MQTT_Struct_t *handle, const char *topicType, in
     PublishParams pub_params = DEFAULT_PUB_PARAMS;
 
     if (0 == qos) {
-        pub_params.qos = QOS0;
+        pub_params.qos = TC_QOS0;
     } else {
-        pub_params.qos = QOS1;
+        pub_params.qos = TC_QOS1;
     }
     pub_params.payload = (void *)msg;
     pub_params.payload_len = strlen(msg);
@@ -93,7 +93,7 @@ static int _otamqtt_publish(OTA_MQTT_Struct_t *handle, const char *topicType, in
 
 /* OTA订阅主题之后收到消息就会执行该回调函数 */
 /* 通过解析JSON字符串获取firmware信息如：版本号、URL、文件大小以及MD5值 */
-static void _otamqtt_upgrage_cb(void *pClient, MQTTMessage *message, void *pcontext)
+static void _otamqtt_upgrage_cb(void *pClient, MQTTMessage_S *message, void *pcontext)
 {
     OTA_MQTT_Struct_t *handle = (OTA_MQTT_Struct_t *) pcontext;
 
@@ -126,7 +126,7 @@ void *qcloud_osc_init(const char *productId, const char *deviceName, void *chann
 
     SubscribeParams sub_params = DEFAULT_SUB_PARAMS;
     sub_params.on_message_handler = _otamqtt_upgrage_cb;
-    sub_params.qos = QOS1;
+    sub_params.qos = TC_QOS1;
     sub_params.user_data = h_osc;
 
     ret = IOT_MQTT_Subscribe(channel, h_osc->topic_upgrade, &sub_params);
@@ -165,19 +165,19 @@ int qcloud_osc_deinit(void *handle)
 /* report progress of OTA */
 int qcloud_osc_report_progress(void *handle, const char *msg)
 {
-    return _otamqtt_publish(handle, "report", QOS0, msg);
+    return _otamqtt_publish(handle, "report", TC_QOS0, msg);
 }
 
 /* report version of OTA firmware */
 int qcloud_osc_report_version(void *handle, const char *msg)
 {
-    return _otamqtt_publish(handle, "report", QOS1, msg);
+    return _otamqtt_publish(handle, "report", TC_QOS1, msg);
 }
 
 /* report upgrade begin of OTA firmware */
 int qcloud_osc_report_upgrade_result(void *handle, const char *msg)
 {
-    return _otamqtt_publish(handle, "report", QOS1, msg);
+    return _otamqtt_publish(handle, "report", TC_QOS1, msg);
 }
 
 #ifdef __cplusplus

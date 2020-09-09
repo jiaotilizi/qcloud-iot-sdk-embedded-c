@@ -42,7 +42,7 @@ static bool get_json_device_name(char *json, char **v) {
 	return *v == NULL ? false: true;
 }
 
-static void _gateway_message_handler(void *client, MQTTMessage *message, void *user_data)
+static void _gateway_message_handler(void *client, MQTTMessage_S *message, void *user_data)
 {
 	Qcloud_IoT_Client *mqtt = NULL;
 	Gateway *gateway = NULL;
@@ -161,7 +161,7 @@ int gateway_subscribe_unsubscribe_topic(Gateway *gateway, char *topic_filter, Su
 
 	STRING_PTR_SANITY_CHECK(topic_filter, QCLOUD_ERR_INVAL);
 
-	params->qos = QOS1;
+	params->qos = TC_QOS1;
 	gateway->gateway_data.sync_status = status;
 
 	if (is_subscribe) {

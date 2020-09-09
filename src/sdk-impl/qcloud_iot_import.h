@@ -45,6 +45,20 @@ typedef enum {
 
 
 /**
+ * @brief 文件读出到buffer
+ *
+ * @return 成功true 失败false
+ */
+bool HAL_ReadFromFile(const char *filename, uint8_t **dataBuff, uint32_t *dataLength);
+
+/**
+ * @brief buffer写入到文件
+ *
+ * @return 成功true 失败false
+ */
+bool HAL_WriteToFile(const char *filename, uint8_t *dataBuff, uint32_t dataLength);
+
+/**
  * @brief 创建互斥锁
  *
  * @return 创建失败返回NULL，成功返回Mutex指针

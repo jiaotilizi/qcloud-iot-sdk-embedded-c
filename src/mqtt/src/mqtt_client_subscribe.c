@@ -69,7 +69,7 @@ static int _serialize_subscribe_packet(unsigned char *buf, size_t buf_len, uint8
         IOT_FUNC_EXIT_RC(QCLOUD_ERR_BUF_TOO_SHORT);
     }
     // 初始化报文头部
-    rc = mqtt_init_packet_header(&header, SUBSCRIBE, QOS1, dup, 0);
+    rc = mqtt_init_packet_header(&header, SUBSCRIBE, TC_QOS1, dup, 0);
     if (QCLOUD_ERR_SUCCESS != rc) {
         IOT_FUNC_EXIT_RC(rc);
     }
@@ -111,7 +111,7 @@ int qcloud_iot_mqtt_subscribe(Qcloud_IoT_Client *pClient, char *topicFilter, Sub
         IOT_FUNC_EXIT_RC(QCLOUD_ERR_MAX_TOPIC_LENGTH);
     }
 
-    if (pParams->qos == QOS2) {
+    if (pParams->qos == TC_QOS2) {
         Log_e("QoS2 is not supported currently");
         IOT_FUNC_EXIT_RC(QCLOUD_ERR_MQTT_QOS_NOT_SUPPORT);
     }

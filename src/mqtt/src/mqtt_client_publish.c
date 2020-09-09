@@ -71,7 +71,7 @@ static uint32_t _get_publish_packet_len(uint8_t qos, char *topicName, size_t pay
     return (uint32_t) len;
 }
 
-static int _mask_push_pubInfo_to(Qcloud_IoT_Client *c, int len, unsigned short msgId, ListNode **node)
+static int _mask_push_pubInfo_to(Qcloud_IoT_Client *c, int len, unsigned short msgId, uint8_t pubfrom, ListNode **node)
 {
     IOT_FUNC_ENTRY;
 
@@ -103,6 +103,7 @@ static int _mask_push_pubInfo_to(Qcloud_IoT_Client *c, int len, unsigned short m
     repubInfo->node_state = MQTT_NODE_STATE_NORMANL;
     repubInfo->msg_id = msgId;
     repubInfo->len = len;
+	repubInfo->pubfrom = pubfrom;
     InitTimer(&repubInfo->pub_start_time);
     countdown_ms(&repubInfo->pub_start_time, c->command_timeout_ms);
 
@@ -187,7 +188,7 @@ int deserialize_publish_packet(uint8_t *dup, QoS *qos, uint8_t *retained, uint16
         IOT_FUNC_EXIT_RC(QCLOUD_ERR_FAILURE);
     }
 
-    if (QOS0 != *qos) {
+    if (TC_QOS0 != *qos) {
         *packet_id = mqtt_read_uint16_t(&curdata);
     }
 
@@ -215,7 +216,7 @@ int serialize_pub_ack_packet(unsigned char *buf, size_t buf_len, MessageTypes pa
 
     unsigned char header = 0;
     unsigned char *ptr = buf;
-    QoS requestQoS = (PUBREL == packet_type) ? QOS1 : QOS0;  // 详见 MQTT协议说明 3.6.1小结
+    QoS requestQoS = (PUBREL == packet_type) ? TC_QOS1 : TC_QOS0;  // 详见 MQTT协议说明 3.6.1小结
     int rc = mqtt_init_packet_header(&header, packet_type, requestQoS, dup, 0);
 
     /* Minimum byte length required by ACK headers is
@@ -310,7 +311,7 @@ int qcloud_iot_mqtt_publish(Qcloud_IoT_Client *pClient, char *topicName, Publish
         IOT_FUNC_EXIT_RC(QCLOUD_ERR_MAX_TOPIC_LENGTH);
     }
 
-    if (pParams->qos == QOS2) {
+    if (pParams->qos == TC_QOS2) {
         Log_e("QoS2 is not supported currently");
         IOT_FUNC_EXIT_RC(QCLOUD_ERR_MQTT_QOS_NOT_SUPPORT);
     }
@@ -323,7 +324,7 @@ int qcloud_iot_mqtt_publish(Qcloud_IoT_Client *pClient, char *topicName, Publish
     countdown_ms(&timer, pClient->command_timeout_ms);
 
     HAL_MutexLock(pClient->lock_write_buf);
-    if (pParams->qos == QOS1) {
+    if (pParams->qos == TC_QOS1) {
         pParams->id = get_next_packet_id(pClient);
         if (IOT_Log_Get_Level() <= DEBUG) {
         	Log_d("publish topic seq=%d|topicName=%s|payload=%s", pParams->id, topicName, (char *)pParams->payload);
@@ -348,8 +349,8 @@ int qcloud_iot_mqtt_publish(Qcloud_IoT_Client *pClient, char *topicName, Publish
         IOT_FUNC_EXIT_RC(rc);
     }
 
-    if (pParams->qos > QOS0) {
-        rc = _mask_push_pubInfo_to(pClient, len, pParams->id, &node);
+    if (pParams->qos > TC_QOS0) {
+        rc = _mask_push_pubInfo_to(pClient, len, pParams->id, pParams->pubfrom, &node);
         if (QCLOUD_ERR_SUCCESS != rc) {
             Log_e("push publish into to pubInfolist failed!");
             HAL_MutexUnlock(pClient->lock_write_buf);
@@ -360,7 +361,7 @@ int qcloud_iot_mqtt_publish(Qcloud_IoT_Client *pClient, char *topicName, Publish
     /* send the publish packet */
     rc = send_mqtt_packet(pClient, len, &timer);
 	if (QCLOUD_ERR_SUCCESS != rc) {
-		if (pParams->qos > QOS0) {
+		if (pParams->qos > TC_QOS0) {
 			HAL_MutexLock(pClient->lock_list_pub);
 			list_remove(pClient->list_pub_wait_ack, node);
 			HAL_MutexUnlock(pClient->lock_list_pub);

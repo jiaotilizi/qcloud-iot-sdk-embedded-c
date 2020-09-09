@@ -166,7 +166,7 @@ static int _decode_packet_rem_len_from_buf_read(uint32_t (*getcharfn)(unsigned c
 }
 
 static unsigned char *bufptr;
-uint32_t bufchar(unsigned char *c, uint32_t count) {
+static uint32_t bufchar(unsigned char *c, uint32_t count) {
     uint32_t i;
 
     for (i = 0; i < count; ++i) {
@@ -301,17 +301,17 @@ int mqtt_init_packet_header(unsigned char *header, MessageTypes message_type,
     }
 
     switch (Qos) {
-        case QOS0:
+        case TC_QOS0:
             qos = 0x00;
             break;
-        case QOS1:
+        case TC_QOS1:
             qos = 0x01;
             break;
-        case QOS2:
+        case TC_QOS2:
             qos = 0x02;
             break;
         default:
-            /* Using QOS0 as default */
+            /* Using TC_QOS0 as default */
             qos = 0x00;
             break;
     }
@@ -496,7 +496,7 @@ int serialize_packet_with_zero_payload(unsigned char *buf, size_t buf_len, Messa
         IOT_FUNC_EXIT_RC(QCLOUD_ERR_BUF_TOO_SHORT);
     }
 
-    rc = mqtt_init_packet_header(&header, packetType, QOS0, 0, 0);
+    rc = mqtt_init_packet_header(&header, packetType, TC_QOS0, 0, 0);
     if (QCLOUD_ERR_SUCCESS != rc) {
         IOT_FUNC_EXIT_RC(rc);
     }
@@ -778,7 +778,7 @@ static uint8_t _is_topic_matched(char *topic_filter, char *topicName, uint16_t t
  * @param message
  * @return
  */
-static int _deliver_message(Qcloud_IoT_Client *pClient, char *topicName, uint16_t topicNameLen, MQTTMessage *message) {
+static int _deliver_message(Qcloud_IoT_Client *pClient, char *topicName, uint16_t topicNameLen, MQTTMessage_S *message) {
     IOT_FUNC_ENTRY;
 
     POINTER_SANITY_CHECK(pClient, QCLOUD_ERR_INVAL);
@@ -833,7 +833,7 @@ static int _deliver_message(Qcloud_IoT_Client *pClient, char *topicName, uint16_
  *
  * @return 0, success; NOT 0, fail;
  */
-static int _mask_pubInfo_from(Qcloud_IoT_Client *c, uint16_t msgId)
+static int _mask_pubInfo_from(Qcloud_IoT_Client *c, uint16_t msgId, uint8_t *pubfrom)
 {
     IOT_FUNC_ENTRY;
 
@@ -867,6 +867,7 @@ static int _mask_pubInfo_from(Qcloud_IoT_Client *c, uint16_t msgId)
 
             if (repubInfo->msg_id == msgId) {
                 repubInfo->node_state = MQTT_NODE_STATE_INVALID; /* 标记为无效节点 */
+				*pubfrom = repubInfo->pubfrom;
             }
         }
 
@@ -934,7 +935,7 @@ static int _handle_puback_packet(Qcloud_IoT_Client *pClient, Timer *timer)
     POINTER_SANITY_CHECK(timer, QCLOUD_ERR_INVAL);
 
     uint16_t packet_id;
-    uint8_t dup, type;
+    uint8_t dup, type, pubfrom = 0;
     int rc;
 
     rc = deserialize_ack_packet(&type, &dup, &packet_id, pClient->read_buf, pClient->read_buf_size);
@@ -942,12 +943,16 @@ static int _handle_puback_packet(Qcloud_IoT_Client *pClient, Timer *timer)
         IOT_FUNC_EXIT_RC(rc);
     }
 
-    (void)_mask_pubInfo_from(pClient, packet_id);
+    (void)_mask_pubInfo_from(pClient, packet_id, &pubfrom);
 
     /* 调用回调函数，通知外部PUBLISH成功. */
     if (NULL != pClient->event_handle.h_fp) {
         MQTTEventMsg msg;
-        msg.event_type = MQTT_EVENT_PUBLISH_SUCCESS;
+		if (0 == pubfrom) {
+        	msg.event_type = MQTT_EVENT_PUBLISH_SUCCESS;
+		} else {
+			msg.event_type = MQTT_EVENT_PUBLISHX_SUCCESS;
+		}
         msg.msg = (void *)(uintptr_t)packet_id;
         pClient->event_handle.h_fp(pClient, pClient->event_handle.context, &msg);
     }
@@ -967,7 +972,7 @@ static int _handle_suback_packet(Qcloud_IoT_Client *pClient, Timer *timer, QoS q
 
     uint32_t count = 0;
     uint16_t packet_id = 0;
-    QoS grantedQoS[3] = {QOS0, QOS0, QOS0};
+    QoS grantedQoS[3] = {TC_QOS0, TC_QOS0, TC_QOS0};
     int rc;
     bool sub_nack = false;
     
@@ -978,7 +983,7 @@ static int _handle_suback_packet(Qcloud_IoT_Client *pClient, Timer *timer, QoS q
     }
 
     int flag_dup = 0, i_free = -1;
-    // 检查SUBACK报文中的返回码:0x00(QOS0, SUCCESS),0x01(QOS1, SUCCESS),0x02(QOS2, SUCCESS),0x80(Failure)
+    // 检查SUBACK报文中的返回码:0x00(TC_QOS0, SUCCESS),0x01(TC_QOS1, SUCCESS),0x02(TC_QOS2, SUCCESS),0x80(Failure)
     if (grantedQoS[0] == 0x80) {
         MQTTEventMsg msg;       
 
@@ -1019,6 +1024,11 @@ static int _handle_suback_packet(Qcloud_IoT_Client *pClient, Timer *timer, QoS q
             if (0 == _check_handle_is_identical(&pClient->sub_handles[i], &sub_handle)) {                
                 flag_dup = 1;
                 Log_w("Identical topic found: %s", sub_handle.topic_filter);
+                if (pClient->sub_handles[i].handler_user_data != sub_handle.handler_user_data) {
+                    Log_w("Update handler_user_data %p -> %p!", 
+                        pClient->sub_handles[i].handler_user_data, sub_handle.handler_user_data);
+                    pClient->sub_handles[i].handler_user_data = sub_handle.handler_user_data;
+                }
                 HAL_Free((void *)sub_handle.topic_filter);
                 sub_handle.topic_filter = NULL;
                 break;
@@ -1120,7 +1130,7 @@ static int _handle_unsuback_packet(Qcloud_IoT_Client *pClient, Timer *timer)
 
 #ifdef MQTT_RMDUP_MSG_ENABLED
 
-#define MQTT_MAX_REPEAT_BUF_LEN 50
+#define MQTT_MAX_REPEAT_BUF_LEN 	(100)
 static uint16_t sg_repeat_packet_id_buf[MQTT_MAX_REPEAT_BUF_LEN];
 
 /**
@@ -1148,7 +1158,7 @@ static void _add_packet_id_to_repeat_buf(uint16_t packet_id)
     sg_repeat_packet_id_buf[current_packet_id_cnt++] = packet_id;
 
     if (current_packet_id_cnt >= MQTT_MAX_REPEAT_BUF_LEN)
-        current_packet_id_cnt = current_packet_id_cnt % 50;
+        current_packet_id_cnt = current_packet_id_cnt % MQTT_MAX_REPEAT_BUF_LEN;
 }
 
 void reset_repeat_packet_id_buffer(void)
@@ -1169,7 +1179,7 @@ static int _handle_publish_packet(Qcloud_IoT_Client *pClient, Timer *timer) {
     IOT_FUNC_ENTRY;
     char *topic_name;
     uint16_t topic_len;
-    MQTTMessage msg;
+    MQTTMessage_S msg;
     int rc;
     uint32_t len = 0;
 
@@ -1188,13 +1198,13 @@ static int _handle_publish_packet(Qcloud_IoT_Client *pClient, Timer *timer) {
 	}
     memcpy(fix_topic, topic_name, topic_len);
 
-    if (QOS0 == msg.qos)
+    if (TC_QOS0 == msg.qos)
     {
         rc = _deliver_message(pClient, fix_topic, topic_len, &msg);
         if (QCLOUD_ERR_SUCCESS != rc)
             IOT_FUNC_EXIT_RC(rc);
 
-        /* No further processing required for QOS0 */
+        /* No further processing required for TC_QOS0 */
         IOT_FUNC_EXIT_RC(rc);
 
     } else {
@@ -1216,9 +1226,9 @@ static int _handle_publish_packet(Qcloud_IoT_Client *pClient, Timer *timer) {
     }
     
     HAL_MutexLock(pClient->lock_write_buf);
-    if (QOS1 == msg.qos) {
+    if (TC_QOS1 == msg.qos) {
         rc = serialize_pub_ack_packet(pClient->write_buf, pClient->write_buf_size, PUBACK, 0, msg.id, &len);
-    } else { /* Message is not QOS0 or 1 means only option left is QOS2 */
+    } else { /* Message is not TC_QOS0 or 1 means only option left is TC_QOS2 */
         rc = serialize_pub_ack_packet(pClient->write_buf, pClient->write_buf_size, PUBREC, 0, msg.id, &len);
     }
 

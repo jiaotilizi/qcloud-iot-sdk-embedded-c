@@ -181,10 +181,19 @@ int IOT_Log_Upload(bool force_upload);
 void Log_writter(const char *file, const char *func, const int line, const int level, const char *fmt, ...);
 
 /* 日志打印及上报对外接口*/
+#if 1
 #define Log_d(args...) Log_writter(__FILE__, __FUNCTION__, __LINE__, DEBUG, args)
 #define Log_i(args...) Log_writter(__FILE__, __FUNCTION__, __LINE__, INFO, args)
 #define Log_w(args...) Log_writter(__FILE__, __FUNCTION__, __LINE__, WARN, args)
 #define Log_e(args...) Log_writter(__FILE__, __FUNCTION__, __LINE__, ERROR, args)
+#else
+#include "osi_log.h"
+#define Log_d(args...) 	sys_arch_printf(args)
+#define Log_i(args...) 	sys_arch_printf(args)
+#define Log_w(args...) 	sys_arch_printf(args)
+#define Log_e(args...) 	sys_arch_printf(args)
+#endif
+
 
 #ifdef IOT_DEBUG
 	#define IOT_FUNC_ENTRY    \

@@ -52,7 +52,7 @@ static bool _get_json_log_level(char *json, int32_t* res)
 	return true;
 }
 
-static void _log_level_sub_cb(void *pClient, MQTTMessage *message, void *pUserData)
+static void _log_level_sub_cb(void *pClient, MQTTMessage_S *message, void *pUserData)
 {
 #define LOG_JSON_LENGTH 128        
     char json_buf[LOG_JSON_LENGTH] = {0};
@@ -148,7 +148,7 @@ static int _iot_log_level_get_publish(void *pClient)
                         "\"clientToken\": \"%s-%u\"}", dev_info->product_id, sg_client_token++);
 
     PublishParams pub_params = DEFAULT_PUB_PARAMS;
-    pub_params.qos = QOS0;
+    pub_params.qos = TC_QOS0;
     pub_params.payload = payload_content;
     pub_params.payload_len = strlen(payload_content);
 
@@ -171,7 +171,7 @@ int qcloud_log_topic_subscribe(void *client)
     sub_params.on_message_handler = _log_level_sub_cb;
     sub_params.on_sub_event_handler = _log_mqtt_sub_event_handler;
     sub_params.user_data = (void *)&sg_state;
-    sub_params.qos = QOS0;    
+    sub_params.qos = TC_QOS0;    
 
     return IOT_MQTT_Subscribe(client, topic_name, &sub_params);
 

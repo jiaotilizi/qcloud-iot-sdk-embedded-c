@@ -83,7 +83,7 @@ void _release_reply_request(sReply *  p_reply)
 }
 
 
-static void _on_event_reply_callback(void *pClient, MQTTMessage *message, void *userData) 
+static void _on_event_reply_callback(void *pClient, MQTTMessage_S *message, void *userData) 
 {
 	POINTER_SANITY_CHECK_RTN(message);
 
@@ -344,7 +344,7 @@ static int _publish_event_to_cloud(void *c, char *pJsonDoc)
 	}
 
 	PublishParams pubParams = DEFAULT_PUB_PARAMS;
-	pubParams.qos = QOS0;
+	pubParams.qos = TC_QOS0;
 	pubParams.payload_len = strlen(pJsonDoc);
 	pubParams.payload = (char *) pJsonDoc;
 

@@ -62,7 +62,7 @@ bool discard_old_delta_flag = true;
 
 typedef void (*TraverseHandle)(Qcloud_IoT_Shadow *pShadow, ListNode **node, List *list, const char *pClientToken, const char *pType);
 
-static void _on_operation_result_handler(void *pClient, MQTTMessage *message, void *pUserdata);
+static void _on_operation_result_handler(void *pClient, MQTTMessage_S *message, void *pUserdata);
 
 static void _handle_delta(Qcloud_IoT_Shadow *pShadow, char* delta_str);
 
@@ -203,7 +203,7 @@ int subscribe_operation_result_to_cloud(Qcloud_IoT_Shadow *pShadow)
 
     SubscribeParams subscribe_params = DEFAULT_SUB_PARAMS;
     subscribe_params.on_message_handler = _on_operation_result_handler;
-    subscribe_params.qos = QOS0;
+    subscribe_params.qos = TC_QOS0;
 
     rc = IOT_MQTT_Subscribe(pShadow->mqtt, pShadow->inner_data.result_topic, &subscribe_params);
     if (rc < 0) {
@@ -242,7 +242,7 @@ static int _publish_operation_to_cloud(Qcloud_IoT_Shadow *pShadow, Method method
     }
 
     PublishParams pubParams = DEFAULT_PUB_PARAMS;
-    pubParams.qos = QOS0;
+    pubParams.qos = TC_QOS0;
     pubParams.payload_len = strlen(pJsonDoc);
     pubParams.payload = (char *) pJsonDoc;
 
@@ -256,7 +256,7 @@ static int _publish_operation_to_cloud(Qcloud_IoT_Shadow *pShadow, Method method
  * 客户端先订阅 $shadow/operation/result/{ProductId}/{DeviceName}, 收到该topic的消息则会调用该回调函数
  * 在这个回调函数中, 解析出各个设备影子文档操作的结果
  */
-static void _on_operation_result_handler(void *pClient, MQTTMessage *message, void *pUserdata)
+static void _on_operation_result_handler(void *pClient, MQTTMessage_S *message, void *pUserdata)
 {
     IOT_FUNC_ENTRY;
 

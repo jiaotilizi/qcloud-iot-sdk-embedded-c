@@ -70,7 +70,7 @@ static int _serialize_unsubscribe_packet(unsigned char *buf, size_t buf_len,
         IOT_FUNC_EXIT_RC(QCLOUD_ERR_BUF_TOO_SHORT);
     }
 
-    rc = mqtt_init_packet_header(&header, UNSUBSCRIBE, QOS1, dup, 0);
+    rc = mqtt_init_packet_header(&header, UNSUBSCRIBE, TC_QOS1, dup, 0);
     if (QCLOUD_ERR_SUCCESS != rc) {
         IOT_FUNC_EXIT_RC(rc);
     }

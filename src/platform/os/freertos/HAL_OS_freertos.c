@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Tencent is pleased to support the open source community by making IoT Hub available.
  * Copyright (C) 2016 THL A29 Limited, a Tencent company. All rights reserved.
 
@@ -16,13 +16,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-#include <memory.h>
 
-#include <pthread.h>
-
-#include <sys/time.h>
-#include <sys/types.h>
 #include <unistd.h>
+#include <lwip/sys.h>
+
+#include "FreeRTOS.h"
+#include "task.h"
+#include "osi_api.h"
+#include "osi_internal.h"
+#include "vfs.h"
 
 #include "qcloud_iot_import.h"
 #include "qcloud_iot_export.h"
@@ -48,68 +50,151 @@ static char sg_device_privatekey_file_name[MAX_SIZE_OF_DEVICE_KEY_FILE_NAME + 1]
 static char sg_device_secret[MAX_SIZE_OF_DEVICE_SERC + 1] = "YOUR_IOT_PSK";
 
 /* 鉴权模式 */
-static DeviceAuthMode sg_auth_mode = AUTH_MODE_MAX;
+static DeviceAuthMode sg_auth_mode = 0;
 
 #else
 
 /* 结构体形式存放设备基本信息文件 */
-#define QCLOUD_IOT_DEVICE_INFO_FILE		"/usr/TencentDevInfo.txt"
+#define QCLOUD_IOT_DEVICE_INFO_FILE		"/TencentDevInfo.txt"
 /* 存放鉴权模式文件 */
-#define QCLOUD_IOT_AUTH_MODE_FILE		"/usr/TencentAuthMode.txt"
+#define QCLOUD_IOT_AUTH_MODE_FILE		"/TencentAuthMode.txt"
+/* 防止程序运行时反复读取鉴权模式的文件 */
+static DeviceAuthMode sg_auth_mode_soft = AUTH_MODE_MAX;
 
 #endif
 
+bool HAL_ReadFromFile(const char *filename, uint8_t **dataBuff, uint32_t *dataLength)
+{
+    Log_i("filename:%s", filename);
+	
+    int fd = -1;
+	int read_size = 0;
+    uint32_t file_size = 0;
+	struct stat st;
 
+	/* 打开文件 */
+    fd = vfs_open(filename, O_RDONLY, 0);
+    if (fd < 0) {
+        Log_e("vfs_open error, fd:%d", fd);
+        return false;
+    }
+
+	/* 获取文件信息 */
+    vfs_fstat(fd, &st);
+    file_size = st.st_size;
+	Log_i("fd:%d, vfs_file_size:%d", fd, file_size);
+    if (file_size < 0) {
+		Log_e("vfs_fstat error");
+        vfs_close(fd);
+        return false;
+    }
+
+	/* 处理入参 buffer */
+    if (*dataBuff != NULL) {
+    	Log_i("free dataBuff!!");
+        HAL_Free(*dataBuff);
+        *dataBuff = NULL;
+    }
+	
+    *dataBuff = (uint8_t *)HAL_Malloc(file_size + 1);		/* 预留字符截止位 */
+    if (NULL == *dataBuff) {
+    	Log_e("malloc error!!");
+        vfs_close(fd);
+        return false;
+    }
+    memset(*dataBuff, 0, file_size + 1);
+
+	/* 读取文件内容存到 buffer 中 */
+    read_size = vfs_read(fd, *dataBuff, file_size);
+    if (read_size != file_size) {
+    	Log_e("vfs_read error!! read_size:%d, file_size:%d", read_size, file_size);
+        HAL_Free(*dataBuff);
+        *dataBuff = NULL;
+        vfs_close(fd);
+        return false;
+    }
+	*dataLength = file_size;
+
+	/* 关闭文件 */
+    vfs_close(fd);
+	
+    return true;
+}
+
+bool HAL_WriteToFile(const char *filename, uint8_t *dataBuff, uint32_t dataLength)
+{
+	Log_i("filename:%s, datalen:%d", filename, dataLength);
+
+    int fd = -1;
+    fd = vfs_open(filename, O_WRONLY | O_TRUNC, 0);
+    if (fd < 0) {
+		Log_i("Begin to Creat File:%s", filename);
+        fd = vfs_open(filename, O_CREAT | O_WRONLY | O_TRUNC);
+        if (fd < 0) {
+			Log_e("vfs_open error, fd:%d", fd);
+            return false;
+        }
+    }
+
+    if (dataLength != vfs_write(fd, dataBuff, dataLength)) {
+		Log_e("vfs_write error!! dataLength:%d", dataLength);
+        vfs_close(fd);
+        return false;
+    }
+    vfs_close(fd);
+	
+    return true;
+}
 
 
 void *HAL_MutexCreate(void)
 {
-    int err_num;
-    pthread_mutex_t *mutex = (pthread_mutex_t *)HAL_Malloc(sizeof(pthread_mutex_t));
-    if (NULL == mutex) {
+	osiMutex_t *mutex = NULL;
+	
+	mutex = osiMutexCreate();
+	
+	if (NULL == mutex) {
+        HAL_Printf("%s: create mutex failed", __FUNCTION__);
         return NULL;
     }
-
-    if (0 != (err_num = pthread_mutex_init(mutex, NULL))) {
-		HAL_Printf("%s: create mutex failed\n", __FUNCTION__);
-        HAL_Free(mutex);
-        return NULL;
-    }
-
-    return mutex;
+	
+	return mutex;
 }
 
 void HAL_MutexDestroy(_IN_ void *mutex)
 {
-    int err_num;
-    if (0 != (err_num = pthread_mutex_destroy((pthread_mutex_t *)mutex))) {
-		HAL_Printf("%s: destroy mutex failed\n", __FUNCTION__);
+    if (NULL == mutex) {
+		HAL_Printf("%s: destroy mutex failed", __FUNCTION__);
+        return;
     }
 
-    HAL_Free(mutex);
+    osiMutexDelete((osiMutex_t *)mutex);
 }
 
 void HAL_MutexLock(_IN_ void *mutex)
 {
-    int err_num;
-    if (0 != (err_num = pthread_mutex_lock((pthread_mutex_t *)mutex))) {     
-		HAL_Printf("%s: lock mutex failed\n", __FUNCTION__);
-    }
+	if (NULL == mutex) {
+		HAL_Printf("%s: Lock mutex failed", __FUNCTION__);
+		return;
+	}
+
+	osiMutexLock((osiMutex_t *)mutex);
 }
 
 int HAL_MutexTryLock(_IN_ void *mutex)
 {
-    return pthread_mutex_trylock((pthread_mutex_t *)mutex);
-    //return 0;
+    return osiMutexTryLock((osiMutex_t *)mutex, 0);
 }
 
 
 void HAL_MutexUnlock(_IN_ void *mutex)
 {
-    int err_num;
-    if (0 != (err_num = pthread_mutex_unlock((pthread_mutex_t *)mutex))) {       
-		HAL_Printf("%s: unlock mutex failed\n", __FUNCTION__);
+    if (NULL == mutex) {
+		HAL_Printf("%s: Unlock mutex failed", __FUNCTION__);
+        return;
     }
+
+    osiMutexUnlock((osiMutex_t *)mutex);
 }
 
 void *HAL_Malloc(_IN_ uint32_t size)
@@ -125,12 +210,15 @@ void HAL_Free(_IN_ void *ptr)
 void HAL_Printf(_IN_ const char *fmt, ...)
 {
     va_list args;
+	char buffer[1024] = {0};
 
     va_start(args, fmt);
-    vprintf(fmt, args);
+    vsnprintf(buffer, sizeof(buffer) - 1, fmt, args);
     va_end(args);
 
-    fflush(stdout);
+	sys_arch_printf("CMIoT-TENCENT-SDK %s", buffer);
+
+    //fflush(stdout);
 }
 
 int HAL_Snprintf(_IN_ char *str, const int len, const char *fmt, ...)
@@ -163,13 +251,14 @@ uint32_t HAL_UptimeMs(void)
 
 void HAL_SleepMs(_IN_ uint32_t ms)
 {
-    usleep(1000 * ms);
+	vTaskDelay(osiMsToOSTick(ms));
+    //usleep(1000 * ms);
 }
 
 #ifndef DEBUG_DEV_INFO_USED
 int HAL_DevInfoFlashRead(void *pdevInfo) 
 {
-	FILE *fp = NULL;
+	int fd = -1;
 	int read_size = 0;
 	DeviceInfo *devInfo = (DeviceInfo *)pdevInfo;
 
@@ -178,31 +267,28 @@ int HAL_DevInfoFlashRead(void *pdevInfo)
 	memset((char *)devInfo, 0, sizeof(DeviceInfo));
 
 	/* 文件不存在时, 则首次进行创建, 并写入初始数值 */
-	if (0 != access(QCLOUD_IOT_DEVICE_INFO_FILE, 0)) {
-		if (NULL != (fp = fopen(QCLOUD_IOT_DEVICE_INFO_FILE, "w+"))) {
-			fwrite(devInfo, sizeof(DeviceInfo), 1, fp);
-			fclose(fp);
+	if (0 > (fd = vfs_open(QCLOUD_IOT_DEVICE_INFO_FILE, O_RDONLY, 0))) {
+		if (0 < (fd = vfs_creat(QCLOUD_IOT_DEVICE_INFO_FILE, 0))) {
+			vfs_write(fd, devInfo, sizeof(DeviceInfo));
+			vfs_lseek(fd, 0, SEEK_SET);
 			Log_i("Creat File: %s!", QCLOUD_IOT_DEVICE_INFO_FILE);
 		} else {
 			Log_e("Creat File: %s Failed!", QCLOUD_IOT_DEVICE_INFO_FILE);
 			return QCLOUD_ERR_FAILURE;
 		}
 	}
+
+	read_size = vfs_read(fd, devInfo, sizeof(DeviceInfo));
+	Log_i("File: %s, read_size = %d, fize_size = %d, fd = %d", QCLOUD_IOT_DEVICE_INFO_FILE, read_size, sizeof(DeviceInfo), fd);
 	
-	if (NULL == (fp = fopen(QCLOUD_IOT_DEVICE_INFO_FILE, "r+"))) {
-		Log_e("Open File %s Failed!", QCLOUD_IOT_DEVICE_INFO_FILE);
-		return QCLOUD_ERR_FAILURE;
-	}
-
-	read_size = fread(devInfo, sizeof(DeviceInfo), 1, fp);
-	fclose(fp);
-
-	return (1 == read_size)? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
+	vfs_close(fd);
+	
+	return (sizeof(DeviceInfo) == read_size)? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
 }
 
 int HAL_DevInfoFlashWrite(void *pdevInfo) 
 {
-	FILE *fp = NULL;
+	int fd = -1;
 	int write_size = 0;
 	DeviceInfo *devInfo = (DeviceInfo *)pdevInfo;
 
@@ -221,15 +307,17 @@ int HAL_DevInfoFlashWrite(void *pdevInfo)
 		return QCLOUD_ERR_FAILURE;
 	}
 	
-	if (NULL == (fp = fopen(QCLOUD_IOT_DEVICE_INFO_FILE, "w+"))) {
+	if (0 > (fd = vfs_creat(QCLOUD_IOT_DEVICE_INFO_FILE, 0))) {
 		Log_e("Open Device Info File Failed");
 		return QCLOUD_ERR_FAILURE;
 	}
 
-	write_size = fwrite(devInfo, sizeof(DeviceInfo), 1, fp);
-	fclose(fp);
+	write_size = vfs_write(fd, devInfo, sizeof(DeviceInfo));
+	Log_i("File: %s, write_size = %d, fize_size = %d, fd = %d", QCLOUD_IOT_DEVICE_INFO_FILE, write_size, sizeof(DeviceInfo), fd);
+	
+	vfs_close(fd);
 
-	return (1 == write_size)? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
+	return (sizeof(DeviceInfo) == write_size)? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
 }
 #endif
 
@@ -702,7 +790,7 @@ int HAL_GetAuthMode(DeviceAuthMode *mode)
 
 	return QCLOUD_ERR_SUCCESS;
 #else
-	FILE *fp = NULL;
+	int fd = -1;
 	int read_size = 0;
 
 	if (NULL == mode) {
@@ -710,12 +798,19 @@ int HAL_GetAuthMode(DeviceAuthMode *mode)
 		return QCLOUD_ERR_FAILURE;
 	}
 
+	/* 防止程序运行时反复读取鉴权模式的文件 */
+	if (AUTH_MODE_MAX != sg_auth_mode_soft) {
+		//Log_i("Get Auth Mode from Soft, Auth Mode = %d", sg_auth_mode_soft);
+		*mode = sg_auth_mode_soft;
+		return QCLOUD_ERR_SUCCESS;
+	}
+
 	/* 文件不存在时, 则首次进行创建, 并写入初始数值 */
-	if (0 != access(QCLOUD_IOT_AUTH_MODE_FILE, 0)) {
-		if (NULL != (fp = fopen(QCLOUD_IOT_AUTH_MODE_FILE, "w+"))) {
-			DeviceAuthMode init_mode = AUTH_MODE_MAX;
-			fwrite(&init_mode, sizeof(DeviceAuthMode), 1, fp);
-			fclose(fp);
+	if (0 > (fd = vfs_open(QCLOUD_IOT_AUTH_MODE_FILE, O_RDONLY, 0))) {
+		if (0 < (fd = vfs_creat(QCLOUD_IOT_AUTH_MODE_FILE, 0))) {
+			DeviceAuthMode init_mode = 0;
+			vfs_write(fd, &init_mode, sizeof(DeviceAuthMode));
+			vfs_lseek(fd, 0, SEEK_SET);
 			Log_i("Creat File: %s!", QCLOUD_IOT_AUTH_MODE_FILE);
 		} else {
 			Log_e("Creat File: %s Failed!", QCLOUD_IOT_AUTH_MODE_FILE);
@@ -723,15 +818,18 @@ int HAL_GetAuthMode(DeviceAuthMode *mode)
 		}
 	}
 
-	if (NULL == (fp = fopen(QCLOUD_IOT_AUTH_MODE_FILE, "r+"))) {
-		Log_e("Open File %s Failed!", QCLOUD_IOT_AUTH_MODE_FILE);
-		return QCLOUD_ERR_FAILURE;
-	}
-
-	read_size = fread(mode, sizeof(DeviceAuthMode), 1, fp);
-	fclose(fp);
+	read_size = vfs_read(fd, mode, sizeof(DeviceAuthMode));
+	Log_i("File: %s, read_size = %d, fize_size = %d, fd = %d", QCLOUD_IOT_AUTH_MODE_FILE, read_size, sizeof(DeviceAuthMode), fd);
 	
-	return (1 == read_size)? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
+	vfs_close(fd);
+
+	if (sizeof(DeviceAuthMode) == read_size) {
+		Log_i("Save Auth Mode in Soft, Auth Mode = %d", *mode);
+		sg_auth_mode_soft = *mode;		/* 防止反复读取, 第一次读之后保存到软件中 */
+		return QCLOUD_ERR_SUCCESS;
+	}
+	
+	return QCLOUD_ERR_FAILURE;
 #endif
 }
 
@@ -746,23 +844,31 @@ int HAL_SetAuthMode(DeviceAuthMode mode)
 
 	return QCLOUD_ERR_SUCCESS;
 #else
-	FILE *fp = NULL;
-	int read_size = 0;
+	int fd = -1;
+	int write_size = 0;
 
 	if (AUTH_MODE_MAX <= mode) {
-		Log_e("exceeds the max mode!");
+		Log_e("Exceeds the max mode!");
 		return QCLOUD_ERR_FAILURE;
 	}
 
-	if (NULL == (fp = fopen(QCLOUD_IOT_AUTH_MODE_FILE, "w+"))) {
-		Log_e("open auth mode file failed!");
+	if (0 > (fd = vfs_creat(QCLOUD_IOT_AUTH_MODE_FILE, 0))) {
+		Log_e("Open Auth Mode File Failed");
 		return QCLOUD_ERR_FAILURE;
 	}
 
-	read_size = fwrite(&mode, sizeof(DeviceAuthMode), 1, fp);
-	fclose(fp);
+	write_size = vfs_write(fd, &mode, sizeof(DeviceAuthMode));
+	Log_i("File: %s, write_size = %d, fize_size = %d, fd = %d", QCLOUD_IOT_AUTH_MODE_FILE, write_size, sizeof(DeviceAuthMode), fd);
 	
-	return (1 == read_size)? QCLOUD_ERR_SUCCESS : QCLOUD_ERR_FAILURE;
+	vfs_close(fd);
+
+	if (sizeof(DeviceAuthMode) == write_size) {
+		Log_i("Save Auth Mode in Soft, Auth Mode = %d", mode);
+		sg_auth_mode_soft = mode;		/* 每一次设置成功刷新软件中数值 */
+		return QCLOUD_ERR_SUCCESS;
+	}
+	
+	return QCLOUD_ERR_FAILURE;
 #endif
 }
 

@@ -31,6 +31,9 @@ extern "C" {
 
 #include "utils_timer.h"
 
+/* 20191125 add by YangTao */
+#define OTA_MQTT_CHANNEL
+
 #define OTA_VERSION_STR_LEN_MIN     (1)
 #define OTA_VERSION_STR_LEN_MAX     (32)
 
@@ -102,13 +105,18 @@ static void _ota_callback(void *pcontext, const char *msg, uint32_t msg_len) {
     		Log_i("Report version success!");
     	}
     	goto End;
-    }
-    else {
+    } else {
         if (strcmp(json_type, UPDATE_FIRMWARE) != 0) {
         	Log_e("Netheir Report version result nor update firmware! type: %s", json_type);
             goto End;
         }
 
+		
+		if (NULL != json_type) {
+            HAL_Free(json_type);
+            json_type = NULL;
+        }
+		
         if (0 != qcloud_otalib_get_params(msg, &json_type, &h_ota->purl, &h_ota->version,
         		h_ota->md5sum, &h_ota->size_file)) {
             Log_e("Get firmware parameter failed");
