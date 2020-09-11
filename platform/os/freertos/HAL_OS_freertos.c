@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Tencent is pleased to support the open source community by making IoT Hub available.
  * Copyright (C) 2018-2020 THL A29 Limited, a Tencent company. All rights reserved.
 
@@ -16,9 +16,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
-#include "freertos/task.h"
+/* CMIoT ML302 modified by YangTao@20200910 */
+#include "FreeRTOS.h"
+#include "semphr.h"
+#include "task.h"
+#include "osi_log.h"
+//#include "freertos/FreeRTOS.h"
+//#include "freertos/semphr.h"
+//#include "freertos/task.h"
+
 #include "qcloud_iot_export_error.h"
 #include "qcloud_iot_import.h"
 
@@ -44,7 +50,8 @@ void HAL_Printf(_IN_ const char *fmt, ...)
     va_list args;
 
     va_start(args, fmt);
-    vprintf(fmt, args);
+    //vprintf(fmt, args);
+	OSI_PRINTFI(fmt, args);		/* CMIoT ML302 modified by YangTao@20200910 */
     va_end(args);
 
     fflush(stdout);

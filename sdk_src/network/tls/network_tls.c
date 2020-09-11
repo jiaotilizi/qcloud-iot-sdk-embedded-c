@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Tencent is pleased to support the open source community by making IoT Hub available.
  * Copyright (C) 2018-2020 THL A29 Limited, a Tencent company. All rights reserved.
 
@@ -21,7 +21,7 @@
 /*
  * TLS/DTLS network API
  */
-#ifndef AUTH_WITH_NOTLS
+//#ifndef AUTH_WITH_NOTLS    /* CMIoT ML302 annotated by YangTao@20200910 */
 
 int network_tls_init(Network *pNetwork)
 {
@@ -114,4 +114,4 @@ int network_dtls_connect(Network *pNetwork)
 }
 #endif
 
-#endif
+//#endif

@@ -1,0 +1,277 @@
+# Copyright (C) 2018 RDA Technologies Limited and/or its affiliates("RDA").
+# All rights reserved.
+#
+# This software is supplied "AS IS" without any warranties.
+# RDA assumes no responsibility or liability for the use of the software,
+# conveys no license or title under any patent, copyright, or mask work
+# right to the product. RDA reserves the right to make changes in the
+# software without notification.  RDA also make no representation or
+# warranty that such application will be suitable for the specified use
+# without further testing or modification.
+
+###################### CONFIG BEGIN ####################################
+# 编译类型: release/debug
+set(BUILD_TYPE "release")
+
+# 编译工具链
+set(PLATFORM "freertos")
+
+# 是否打开MQTT通道的总开关
+set(FEATURE_MQTT_COMM_ENABLED ON)
+
+# 是否打开设备影子的总开关
+set(FEATURE_MQTT_DEVICE_SHADOW ON)
+
+# 是否打开CoAP通道的总开关
+set(FEATURE_COAP_COMM_ENABLED OFF)
+
+# 是否打开MQTT通道网关功能
+set(FEATURE_GATEWAY_ENABLED ON)
+
+# 是否打开OTA固件升级总开关
+set(FEATURE_OTA_COMM_ENABLED ON)
+
+# OTA信令通道类型：MQTT/COAP
+set(FEATURE_OTA_SIGNAL_CHANNEL "MQTT")
+
+# MQTT/CoAP接入认证方式，使用证书认证：CERT；使用密钥认证：KEY
+set(FEATURE_AUTH_MODE "CERT")
+
+# 接入认证是否不使用TLS，证书方式必须选择使用TLS，密钥认证可选择不使用TLS
+set(FEATURE_AUTH_WITH_NOTLS OFF)
+
+# 是否打开多线程功能支持
+set(FEATURE_MULTITHREAD_ENABLED ON)
+
+# 是否使能设备动态注册
+set(FEATURE_DEV_DYN_REG_ENABLED ON)
+
+# 是否打开日志上报云端功能
+set(FEATURE_LOG_UPLOAD_ENABLED OFF)
+
+# 是否打开代码中获取设备信息功能，OFF时将从device_info.json中读取设备信息
+set(FEATURE_DEBUG_DEV_INFO_USED OFF)
+
+# 是否打开获取iot后台时间功能
+set(FEATURE_SYSTEM_COMM_ENABLED ON)
+
+# 是否使用HTTPS下载固件
+set(FEATURE_OTA_USE_HTTPS ON)
+
+# 是否打开广播功能
+set(FEATURE_BROADCAST_ENABLED ON)
+
+# 是否打开RRPC功能
+set(FEATURE_RRPC_ENABLED ON)
+
+# 是否打开AT模组TCP功能
+set(FEATURE_AT_TCP_ENABLED OFF)
+
+# 设置AT模组设备（目前只支持esp8266）
+set(AT_DEVICE_NAME "ml302")
+
+# 是否打开AT模组中断接收功能
+set(FEATURE_AT_UART_RECV_IRQ OFF)
+
+# 是否打开AT模组多线程功能
+set(FEATURE_AT_OS_USED OFF)
+
+# 是否打开AT模组调试功能
+set(FEATURE_AT_DEBUG OFF)
+###################### CONFIG END ######################################
+
+###################### 解析配置到 config.h 头文件 BEGIN ######################
+if(${BUILD_TYPE} STREQUAL  "release")
+    option(IOT_DEBUG "Enable IOT_DEBUG" OFF)
+elseif(${BUILD_TYPE} STREQUAL  "debug")
+    option(IOT_DEBUG "Enable IOT_DEBUG" ON)
+else()
+    message(FATAL_ERROR "INVAILD BUILD_TYPE:${BUILD_TYPE}!")
+endif()
+
+if(${FEATURE_AUTH_MODE} STREQUAL  "KEY")
+    option(AUTH_MODE_KEY "Enable AUTH_MODE_KEY" ON)
+    option(AUTH_MODE_CERT "Enable AUTH_MODE_CERT" OFF)
+elseif(${FEATURE_AUTH_MODE} STREQUAL  "CERT" AND ${FEATURE_AUTH_WITH_NOTLS} STREQUAL "OFF")
+    option(AUTH_MODE_KEY "Enable AUTH_MODE_KEY" OFF)
+    option(AUTH_MODE_CERT "Enable AUTH_MODE_CERT" ON)
+    option(AUTH_WITH_NOTLS "Enable AUTH_WITH_NOTLS" OFF)
+else()
+    message(FATAL_ERROR "INVAILD AUTH_MODE:${FEATURE_AUTH_MODE} WITH AUTH_WITH_NOTLS:${FEATURE_AUTH_WITH_NOTLS}!")
+endif()
+
+if(${FEATURE_OTA_COMM_ENABLED} STREQUAL "ON")
+    if(${FEATURE_OTA_SIGNAL_CHANNEL} STREQUAL "MQTT" AND ${FEATURE_MQTT_COMM_ENABLED} STREQUAL "ON" )
+        option(OTA_MQTT_CHANNEL "Enable TA_MQTT_CHANNEL" ON)
+    elseif(${FEATURE_OTA_SIGNAL_CHANNEL} STREQUAL "COAP" AND ${FEATURE_COAP_COMM_ENABLED} STREQUAL "ON")
+        option(OTA_MQTT_CHANNEL "Enable TA_MQTT_CHANNEL" OFF)
+    else()
+        message(FATAL_ERROR "INVAILD OTA_SIGNAL_CHANNEL:${FEATURE_OTA_SIGNAL_CHANNEL} OR DISABLED OTA_COMM, MQTT_COMM, COAP_COMM!")
+    endif()
+endif()
+
+option(GATEWAY_ENABLED "Enable GATEWAY" ${FEATURE_GATEWAY_ENABLED})
+option(AUTH_WITH_NOTLS "Enable AUTH_WITH_NOTLS" ${FEATURE_AUTH_WITH_NOTLS})
+option(COAP_COMM_ENABLED "Enable COAP_COMM" ${FEATURE_COAP_COMM_ENABLED})
+option(SYSTEM_COMM "Enable SYSTEM_COMM" ${FEATURE_SYSTEM_COMM_ENABLED})
+option(MULTITHREAD_ENABLED "Enable Multi-thread support" ${FEATURE_MULTITHREAD_ENABLED})
+option(DEV_DYN_REG_ENABLED "Enable DEV_DYN_REG" ${FEATURE_DEV_DYN_REG_ENABLED})
+option(LOG_UPLOAD "Enable LOG_UPLOAD" ${FEATURE_LOG_UPLOAD_ENABLED})
+option(DEBUG_DEV_INFO_USED "Enable DEBUG_DEV_INFO_USED" ${FEATURE_DEBUG_DEV_INFO_USED})
+option(OTA_USE_HTTPS "Enable OTA_USE_HTTPS" ${FEATURE_OTA_USE_HTTPS})
+option(AT_TCP_ENABLED "Enable AT_TCP" ${FEATURE_AT_TCP_ENABLED})
+option(BROADCAST_ENABLED "Enable BROADCAST" ${FEATURE_BROADCAST_ENABLED})
+option(RRPC_ENABLED "Enable RRPC" ${FEATURE_RRPC_ENABLED})
+
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/tools/cmake_scripts/config.h.in"
+  "${CMAKE_CURRENT_SOURCE_DIR}/include/config.h" 
+  @ONLY
+)
+###################### 解析配置到 config.h 头文件 END ######################
+
+set(target libtencent)
+add_library(${target} STATIC)
+set_target_properties(${target} PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${out_lib_dir})
+set_target_properties(${target} PROPERTIES OUTPUT_NAME tencent)
+#target_compile_definitions(${target} PRIVATE AT_TENCENT_SUPPORT=1)
+target_link_libraries(${target} PRIVATE kernel lwip mbedtls cfw fs)
+#### ML302 system include ####
+target_include_directories(${target} PUBLIC include)
+target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(${target} PRIVATE ../include)
+target_include_directories(${target} PRIVATE ../../kernel/freertos/include)
+target_include_directories(${target} PRIVATE ../../kernel/src)
+target_include_directories(${target} PRIVATE ../../hal/include)
+if(CONFIG_CPU_ARMV7A)
+    target_include_directories(${target} PRIVATE ../../kernel/arch/armv7a)
+elseif(CONFIG_CPU_ARMV7M)
+    target_include_directories(${target} PRIVATE ../../kernel/arch/armv7m)
+elseif((CONFIG_CPU_MIPS_XCPU) OR (CONFIG_CPU_MIPS_XCPU2))
+    target_include_directories(${target} PRIVATE ../../kernel/arch/xcpu)
+endif()
+#### ML302 lwip include ####
+target_include_directories(${target} PRIVATE ../../cfw/include)
+target_include_directories(${target} PRIVATE ../../kernel/include)
+target_include_directories(${target} PRIVATE ../lwip/include)
+target_include_directories(${target} PRIVATE ../lwip/src/include)
+#### ML302 mbedtls include ####
+target_include_directories(${target} PRIVATE ../mbedtls/include)
+#### ML302 other include ####
+#target_include_directories(${target} PRIVATE ../../newlib/include)
+#### Tencent IoT SDK include ####
+target_include_directories(${target} PRIVATE include)
+target_include_directories(${target} PRIVATE include/exports)
+target_include_directories(${target} PRIVATE sdk_src/internal_inc)
+
+#### Tencent IoT SDK src platform ####
+file(GLOB src_os ${CMAKE_CURRENT_SOURCE_DIR}/platform/os/${PLATFORM}/*.c )
+set(src_platform  ${src_os})
+
+if(${FEATURE_AUTH_WITH_NOTLS} STREQUAL "OFF")
+    file(GLOB src_platform_tls ${CMAKE_CURRENT_SOURCE_DIR}/platform/tls/mbedtls/*.c)
+    list(APPEND src_platform ${src_platform_tls})
+endif()
+
+#### Tencent IoT SDK src platform ####
+# UTILS
+file(GLOB src_utils ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/utils/*.c)
+set(src_sdk  ${src_utils})
+
+# MQTT
+if(${FEATURE_MQTT_COMM_ENABLED} STREQUAL "ON")
+    # mqtt
+    file(GLOB src_mqtt ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/protocol/mqtt/*.c)
+    list(APPEND src_sdk ${src_mqtt})
+
+    # shadow 
+    if(${FEATURE_MQTT_DEVICE_SHADOW} STREQUAL "ON")
+        file(GLOB src_shadow ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/services/shadow/*.c)
+        list(APPEND src_sdk ${src_shadow})
+    endif()
+
+    # ota mqtt
+    if(${FEATURE_OTA_COMM_ENABLED} STREQUAL "ON" AND ${FEATURE_OTA_SIGNAL_CHANNEL} STREQUAL "MQTT")
+        file(GLOB src_mqtt_ota 
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/services/ota/ota_client.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/services/ota/ota_fetch.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/services/ota/ota_lib.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/services/ota/ota_mqtt.c)
+        list(APPEND src_sdk ${src_mqtt_ota})
+    endif()
+
+    # gateway
+    if(${FEATURE_GATEWAY_ENABLED} STREQUAL "ON")
+        file(GLOB src_gateway ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/services/gateway/*.c)
+        list(APPEND src_sdk ${src_gateway})
+    endif()
+endif()
+
+# COAP 
+if(${FEATURE_COAP_COMM_ENABLED} STREQUAL "ON")
+    # coap
+    file(GLOB src_coap ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/protocol/coap/*.c)
+    list(APPEND src_sdk ${src_coap})
+	
+    # ota coap
+    if(${FEATURE_OTA_COMM_ENABLED} STREQUAL "ON" AND ${FEATURE_OTA_SIGNAL_CHANNEL} STREQUAL "COAP")
+        file(GLOB src_coap_ota 
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/services/ota/ota_client.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/services/ota/ota_fetch.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/services/ota/ota_lib.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/services/ota/ota_coap.c)
+        list(APPEND src_sdk ${src_coap_ota})
+    endif()
+endif()
+
+# HTTP 
+if(${FEATURE_OTA_COMM_ENABLED} STREQUAL "ON" OR ${FEATURE_DEV_DYN_REG_ENABLED} STREQUAL "ON" OR ${FEATURE_LOG_UPLOAD_ENABLED} STREQUAL "ON")
+    # http
+    file(GLOB src_http ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/protocol/http/*.c)
+    list(APPEND src_sdk ${src_http})
+endif()
+
+# TLS
+if(${FEATURE_AUTH_WITH_NOTLS} STREQUAL "OFF")
+    file(GLOB src_tls ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/network/tls/*.c)
+    list(APPEND src_sdk ${src_tls})
+endif()
+
+# NETWORK
+# tcp
+file(GLOB src_socket ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/network/socket/*.c)
+list(APPEND src_sdk ${src_socket})
+# interface
+file(GLOB src_network ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/network/*.c)
+list(APPEND src_sdk ${src_network})
+
+# OTHRE SERVICES
+if(${FEATURE_LOG_UPLOAD_ENABLED} STREQUAL "ON")
+    file(GLOB src_log_upload ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/services/log/*.c)
+    list(APPEND src_sdk ${src_log_upload})
+endif()
+
+if(${FEATURE_DEV_DYN_REG_ENABLED} STREQUAL "ON")
+    file(GLOB src_dyn_reg ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/services/dynreg/*.c)
+    list(APPEND src_sdk ${src_dyn_reg})
+endif()
+
+if(${FEATURE_SYSTEM_COMM_ENABLED} STREQUAL "ON")
+    file(GLOB src_system ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/services/system/*.c)
+    list(APPEND src_sdk ${src_system})
+endif()
+
+if(${FEATURE_BROADCAST_ENABLED} STREQUAL "ON")
+    file(GLOB src_broadcast ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/services/broadcast/*.c)
+    list(APPEND src_sdk ${src_broadcast})
+endif()
+
+if(${FEATURE_RRPC_ENABLED} STREQUAL "ON")
+    file(GLOB src_rrpc ${CMAKE_CURRENT_SOURCE_DIR}/sdk_src/services/rrpc/*.c)
+    list(APPEND src_sdk ${src_rrpc})
+endif()
+
+target_sources(${target} PRIVATE
+    ${src_platform}
+    ${src_sdk}
+)

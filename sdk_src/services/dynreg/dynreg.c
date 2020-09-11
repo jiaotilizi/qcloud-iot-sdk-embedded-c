@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Tencent is pleased to support the open source community by making IoT Hub available.
  * Copyright (C) 2018-2020 THL A29 Limited, a Tencent company. All rights reserved.
 
@@ -40,13 +40,13 @@ extern "C" {
 #define BASE64_ENCODE_OUT_LEN(x)    (((x + 3) * 4) / 3)
 #define DYN_REG_RES_HTTP_TIMEOUT_MS (2000)
 
-#ifdef AUTH_MODE_CERT
+//#ifdef AUTH_MODE_CERT    /* CMIoT ML302 annotated by YangTao@20200910 */
 #define DYN_RESPONSE_BUFF_LEN (5 * 1024)
 #define DECODE_BUFF_LEN       (5 * 1024)
-#else
-#define DYN_RESPONSE_BUFF_LEN (256)
-#define DECODE_BUFF_LEN       (256)
-#endif
+//#else
+//#define DYN_RESPONSE_BUFF_LEN (256)
+//#define DECODE_BUFF_LEN       (256)
+//#endif
 
 /* Knuth's TAOCP section 3.6 */
 #define M ((1U << 31) - 1)
@@ -93,7 +93,7 @@ void srand_d(unsigned int i)
 
 static int _get_json_resault_code(char *json)
 {
-    int   resault = -1;
+    int32_t   resault = -1;    /* CMIoT ML302 modified by YangTao@20200910 */
     char *v       = LITE_json_value_of(CODE_RESAULT, json);
 
     if (v == NULL) {
@@ -114,7 +114,7 @@ static int _get_json_resault_code(char *json)
 
 static int _get_json_encry_type(char *json)
 {
-    int   type = -1;
+    int32_t   type = -1;    /* CMIoT ML302 modified by YangTao@20200910 */
     char *v    = LITE_json_value_of(ENCRYPT_TYPE, json);
 
     if (v == NULL) {
@@ -133,7 +133,7 @@ static int _get_json_encry_type(char *json)
     return type;
 }
 
-#ifndef AUTH_MODE_CERT
+//#ifndef AUTH_MODE_CERT    /* CMIoT ML302 annotated by YangTao@20200910 */
 
 static char *_get_json_psk(char *json)
 {
@@ -146,7 +146,7 @@ static char *_get_json_psk(char *json)
     return psk;
 }
 
-#else
+//#else
 static char *_get_json_cert_data(char *json)
 {
     char *cert = LITE_json_value_of(CERT_DATA, json);
@@ -210,7 +210,7 @@ exit:
     return Ret;
 }
 
-#endif
+//#endif
 
 static int _parse_devinfo(char *jdoc, DeviceInfo *pDevInfo)
 {
@@ -224,12 +224,12 @@ static int _parse_devinfo(char *jdoc, DeviceInfo *pDevInfo)
     unsigned char iv[16];
     char *        payload = NULL;
 
-#ifdef AUTH_MODE_CERT
+//#ifdef AUTH_MODE_CERT    /* CMIoT ML302 annotated by YangTao@20200910 */
     char *clientCert;
     char *clientKey;
-#else
+//#else
     char *psk;
-#endif
+//#endif
 
     Log_d("recv: %s", jdoc);
 
@@ -278,68 +278,70 @@ static int _parse_devinfo(char *jdoc, DeviceInfo *pDevInfo)
         goto exit;
     }
 
-#ifdef AUTH_MODE_CERT
-    if (eCERT_TYPE != enType) {
-        Log_e("encryt type should be cert type");
-        ret = QCLOUD_ERR_FAILURE;
-        goto exit;
-    }
+//#ifdef AUTH_MODE_CERT    /* CMIoT ML302 modified by YangTao@20200910 */
+	if (AUTH_MODE_CERT_TLS == HAL_GetAuthMode()) {
+	    if (eCERT_TYPE != enType) {
+	        Log_e("encryt type should be cert type");
+	        ret = QCLOUD_ERR_FAILURE;
+	        goto exit;
+	    }
 
-    clientCert = _get_json_cert_data(decodeBuff);
-    if (NULL != clientCert) {
-        memset(pDevInfo->dev_cert_file_name, 0, MAX_SIZE_OF_DEVICE_CERT_FILE_NAME);
-        HAL_Snprintf(pDevInfo->dev_cert_file_name, MAX_SIZE_OF_DEVICE_CERT_FILE_NAME, "%s_cert.crt",
-                     pDevInfo->device_name);
-        if (QCLOUD_RET_SUCCESS != _cert_file_save(pDevInfo->dev_cert_file_name, clientCert, strlen(clientCert))) {
-            Log_e("save %s file fail", pDevInfo->dev_cert_file_name);
-            ret = QCLOUD_ERR_FAILURE;
-        }
+	    clientCert = _get_json_cert_data(decodeBuff);
+	    if (NULL != clientCert) {
+	        memset(pDevInfo->dev_cert_file_name, 0, MAX_SIZE_OF_DEVICE_CERT_FILE_NAME);
+	        HAL_Snprintf(pDevInfo->dev_cert_file_name, MAX_SIZE_OF_DEVICE_CERT_FILE_NAME, "%s_cert.crt",
+	                     pDevInfo->device_name);
+	        if (QCLOUD_RET_SUCCESS != _cert_file_save(pDevInfo->dev_cert_file_name, clientCert, strlen(clientCert))) {
+	            Log_e("save %s file fail", pDevInfo->dev_cert_file_name);
+	            ret = QCLOUD_ERR_FAILURE;
+	        }
 
-        HAL_Free(clientCert);
+	        HAL_Free(clientCert);
 
-    } else {
-        Log_e("Get clientCert data fail");
-        ret = QCLOUD_ERR_FAILURE;
-    }
+	    } else {
+	        Log_e("Get clientCert data fail");
+	        ret = QCLOUD_ERR_FAILURE;
+	    }
 
-    clientKey = _get_json_key_data(decodeBuff);
-    if (NULL != clientKey) {
-        memset(pDevInfo->dev_key_file_name, 0, MAX_SIZE_OF_DEVICE_SECRET_FILE_NAME);
-        HAL_Snprintf(pDevInfo->dev_key_file_name, MAX_SIZE_OF_DEVICE_SECRET_FILE_NAME, "%s_private.key",
-                     pDevInfo->device_name);
-        if (QCLOUD_RET_SUCCESS != _cert_file_save(pDevInfo->dev_key_file_name, clientKey, strlen(clientKey))) {
-            Log_e("save %s file fail", pDevInfo->dev_key_file_name);
-            ret = QCLOUD_ERR_FAILURE;
-        }
+	    clientKey = _get_json_key_data(decodeBuff);
+	    if (NULL != clientKey) {
+	        memset(pDevInfo->dev_key_file_name, 0, MAX_SIZE_OF_DEVICE_SECRET_FILE_NAME);
+	        HAL_Snprintf(pDevInfo->dev_key_file_name, MAX_SIZE_OF_DEVICE_SECRET_FILE_NAME, "%s_private.key",
+	                     pDevInfo->device_name);
+	        if (QCLOUD_RET_SUCCESS != _cert_file_save(pDevInfo->dev_key_file_name, clientKey, strlen(clientKey))) {
+	            Log_e("save %s file fail", pDevInfo->dev_key_file_name);
+	            ret = QCLOUD_ERR_FAILURE;
+	        }
 
-        HAL_Free(clientKey);
+	        HAL_Free(clientKey);
 
-    } else {
-        Log_e("Get clientCert data fail");
-        ret = QCLOUD_ERR_FAILURE;
-    }
+	    } else {
+	        Log_e("Get clientCert data fail");
+	        ret = QCLOUD_ERR_FAILURE;
+	    }
+//#else
+	} else {
+	    if (ePSK_TYPE != enType) {
+	        Log_e("encryt type should be psk type");
+	        ret = QCLOUD_ERR_FAILURE;
+	        goto exit;
+	    }
 
-#else
-    if (ePSK_TYPE != enType) {
-        Log_e("encryt type should be psk type");
-        ret = QCLOUD_ERR_FAILURE;
-        goto exit;
-    }
-
-    psk = _get_json_psk(decodeBuff);
-    if (NULL != psk) {
-        if (strlen(psk) > MAX_SIZE_OF_DEVICE_SECRET) {
-            Log_e("psk exceed max len,%s", psk);
-            strcpy(pDevInfo->device_secret, psk);
-        } else {
-            strncpy(pDevInfo->device_secret, psk, MAX_SIZE_OF_DEVICE_SECRET);
-            pDevInfo->device_secret[MAX_SIZE_OF_DEVICE_SECRET] = '\0';
-        }
-        HAL_Free(psk);
-    } else {
-        Log_e("Get psk data fail");
-    }
-#endif
+	    psk = _get_json_psk(decodeBuff);
+	    if (NULL != psk) {
+	        if (strlen(psk) > MAX_SIZE_OF_DEVICE_SECRET) {
+	            Log_e("psk exceed max len,%s", psk);
+	            strcpy(pDevInfo->device_secret, psk);
+	        } else {
+	            strncpy(pDevInfo->device_secret, psk, MAX_SIZE_OF_DEVICE_SECRET);
+	            pDevInfo->device_secret[MAX_SIZE_OF_DEVICE_SECRET] = '\0';
+	        }
+	        HAL_Free(psk);
+	    } else {
+	        Log_e("Get psk data fail");
+	    }
+//#endif
+	}
 exit:
 
     if (payload) {
@@ -362,14 +364,17 @@ static int _post_reg_request_by_http(char *request_buf, DeviceInfo *pDevInfo)
     char        respbuff[DYN_RESPONSE_BUFF_LEN];
 
     /*format URL*/
-#ifndef AUTH_WITH_NOTLS
-    HAL_Snprintf(url, REG_URL_MAX_LEN, url_format, "https", DYN_REG_SERVER_URL);
-    port   = DYN_REG_SERVER_PORT_TLS;
-    ca_crt = iot_ca_get();
-#else
-    HAL_Snprintf(url, REG_URL_MAX_LEN, url_format, "http", DYN_REG_SERVER_URL);
-    port = DYN_REG_SERVER_PORT;
-#endif
+//#ifndef AUTH_WITH_NOTLS
+	if (AUTH_MODE_KEY_NO_TLS != HAL_GetAuthMode()) {
+	    HAL_Snprintf(url, REG_URL_MAX_LEN, url_format, "https", DYN_REG_SERVER_URL);
+	    port   = DYN_REG_SERVER_PORT_TLS;
+	    ca_crt = iot_ca_get();
+//#else
+	} else {
+	    HAL_Snprintf(url, REG_URL_MAX_LEN, url_format, "http", DYN_REG_SERVER_URL);
+	    port = DYN_REG_SERVER_PORT;
+//#endif
+	}
 
     memset((char *)&http_client, 0, sizeof(HTTPClient));
     memset((char *)&http_data, 0, sizeof(HTTPClientData));

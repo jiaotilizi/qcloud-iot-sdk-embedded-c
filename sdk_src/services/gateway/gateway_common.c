@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Tencent is pleased to support the open source community by making IoT Hub available.
  * Copyright (C) 2018-2020 THL A29 Limited, a Tencent company. All rights reserved.
 
@@ -367,7 +367,7 @@ int gateway_publish_sync(Gateway *gateway, char *topic, PublishParams *params, i
     IOT_FUNC_EXIT_RC(QCLOUD_RET_SUCCESS);
 }
 
-#ifdef AUTH_MODE_CERT
+//#ifdef AUTH_MODE_CERT    /* CMIoT ML302 annotated by YangTao@20200910 */
 static int gen_key_from_cert_file(const char *file_path, char *keybuff, int buff_len)
 {
     FILE *   fp;
@@ -405,7 +405,7 @@ exit:
     return ret;
 }
 
-#endif
+//#endif
 
 int subdev_bind_hmac_sha1_cal(DeviceInfo *pDevInfo, char *signout, int max_signlen, int nonce, long timestamp)
 {
@@ -427,16 +427,19 @@ int subdev_bind_hmac_sha1_cal(DeviceInfo *pDevInfo, char *signout, int max_signl
 
     // gen digest key
     char key[BIND_SIGN_KEY_SIZE + 1] = {0};
-#ifdef AUTH_MODE_CERT
-    ret = gen_key_from_cert_file(pDevInfo->dev_cert_file_name, key, BIND_SIGN_KEY_SIZE);
-    if (QCLOUD_RET_SUCCESS != ret) {
-        Log_e("gen key from cert file fail, ret:%d", ret);
-        HAL_Free(pSignText);
-        return ret;
-    }
-#else
-    strncpy(key, pDevInfo->device_secret, strlen(pDevInfo->device_secret));
-#endif
+//#ifdef AUTH_MODE_CERT    /* CMIoT ML302 modified by YangTao@20200910 */
+	if (AUTH_MODE_CERT_TLS == HAL_GetAuthMode()) {
+	    ret = gen_key_from_cert_file(pDevInfo->dev_cert_file_name, key, BIND_SIGN_KEY_SIZE);
+	    if (QCLOUD_RET_SUCCESS != ret) {
+	        Log_e("gen key from cert file fail, ret:%d", ret);
+	        HAL_Free(pSignText);
+	        return ret;
+	    }
+//#else
+	} else {
+    	strncpy(key, pDevInfo->device_secret, strlen(pDevInfo->device_secret));
+//#endif
+	}
 
     /*cal hmac sha1*/
     char sign[SUBDEV_BIND_SIGN_LEN] = {0};

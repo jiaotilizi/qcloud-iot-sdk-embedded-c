@@ -1,4 +1,4 @@
-/*******************************************************************************
+﻿/*******************************************************************************
  * Copyright (c) 2014 IBM Corp.
  *
  * All rights reserved. This program and the accompanying materials
@@ -93,10 +93,12 @@ static void _copy_connect_params(MQTTConnectParams *destination, MQTTConnectPara
     destination->keep_alive_interval = source->keep_alive_interval;
     destination->clean_session       = source->clean_session;
     destination->auto_connect_enable = source->auto_connect_enable;
-#ifdef AUTH_WITH_NOTLS
-    destination->device_secret     = source->device_secret;
-    destination->device_secret_len = source->device_secret_len;
-#endif
+//#ifdef AUTH_WITH_NOTLS    /* CMIoT ML302 modified by YangTao@20200910 */
+	if (AUTH_MODE_KEY_NO_TLS == HAL_GetAuthMode()) {
+	    destination->device_secret     = source->device_secret;
+	    destination->device_secret_len = source->device_secret_len;
+	}
+//#endif
 }
 
 /**
@@ -146,21 +148,24 @@ static int _serialize_connect_packet(unsigned char *buf, size_t buf_len, MQTTCon
     get_next_conn_id(options->conn_id);
     HAL_Snprintf(options->username, username_len, "%s;%s;%s;%ld", options->client_id, QCLOUD_IOT_DEVICE_SDK_APPID,
                  options->conn_id, cur_timesec);
-
-#if defined(AUTH_WITH_NOTLS) && defined(AUTH_MODE_KEY)
-    if (options->device_secret != NULL && options->username != NULL) {
-        char sign[41] = {0};
-        utils_hmac_sha1(options->username, strlen(options->username), sign, options->device_secret,
-                        options->device_secret_len);
-        options->password = (char *)HAL_Malloc(51);
-        if (options->password == NULL) {
-            Log_e("malloc password failed!");
-            rc = QCLOUD_ERR_MALLOC;
-            goto err_exit;
-        }
-        HAL_Snprintf(options->password, 51, "%s;hmacsha1", sign);
-    }
-#endif
+	
+/* CMIoT ML302 modified by YangTao@20200910 */
+//#if defined(AUTH_WITH_NOTLS) && defined(AUTH_MODE_KEY)
+	if (AUTH_MODE_KEY_NO_TLS == HAL_GetAuthMode()) {
+	    if (options->device_secret != NULL && options->username != NULL) {
+	        char sign[41] = {0};
+	        utils_hmac_sha1(options->username, strlen(options->username), sign, options->device_secret,
+	                        options->device_secret_len);
+	        options->password = (char *)HAL_Malloc(51);
+	        if (options->password == NULL) {
+	            Log_e("malloc password failed!");
+	            rc = QCLOUD_ERR_MALLOC;
+	            goto err_exit;
+	        }
+	        HAL_Snprintf(options->password, 51, "%s;hmacsha1", sign);
+	    }
+	}
+//#endif
 
     rem_len = _get_packet_connect_rem_len(options);
     if (get_mqtt_packet_len(rem_len) > buf_len) {
@@ -193,10 +198,13 @@ static int _serialize_connect_packet(unsigned char *buf, size_t buf_len, MQTTCon
     // flags in variable header
     flags |= (options->clean_session) ? MQTT_CONNECT_FLAG_CLEAN_SES : 0;
     flags |= (options->username != NULL) ? MQTT_CONNECT_FLAG_USERNAME : 0;
-
-#if defined(AUTH_WITH_NOTLS) && defined(AUTH_MODE_KEY)
-    flags |= MQTT_CONNECT_FLAG_PASSWORD;
-#endif
+	
+/* CMIoT ML302 modified by YangTao@20200910 */
+//#if defined(AUTH_WITH_NOTLS) && defined(AUTH_MODE_KEY)
+	if (AUTH_MODE_KEY_NO_TLS == HAL_GetAuthMode()) {
+    	flags |= MQTT_CONNECT_FLAG_PASSWORD;
+	}
+//#endif
 
     mqtt_write_char(&ptr, flags);
 

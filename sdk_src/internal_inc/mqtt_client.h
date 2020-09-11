@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Tencent is pleased to support the open source community by making IoT Hub available.
  * Copyright (C) 2018-2020 THL A29 Limited, a Tencent company. All rights reserved.
 
@@ -137,27 +137,21 @@ typedef struct {
 
     uint8_t auto_connect_enable;  // enable auto connection or not
 
-#ifdef AUTH_WITH_NOTLS
+//#ifdef AUTH_WITH_NOTLS    /* CMIoT ML302 annotated by YangTao@20200910 */
     char *device_secret;      // PSK
     int   device_secret_len;  // length of PSK
-#endif
+//#endif
 
 } MQTTConnectParams;
 
 /**
  * default value of MQTT connect parameters structure
  */
-#ifdef AUTH_WITH_NOTLS
+/* CMIoT ML302 modified by YangTao@20200910 */
 #define DEFAULT_MQTTCONNECT_PARAMS                                            \
     {                                                                         \
         NULL, NULL, NULL, {0}, {'M', 'Q', 'T', 'C'}, 0, 4, 240, 1, 1, NULL, 0 \
     }
-#else
-#define DEFAULT_MQTTCONNECT_PARAMS                                   \
-    {                                                                \
-        NULL, NULL, NULL, {0}, {'M', 'Q', 'T', 'C'}, 0, 4, 240, 1, 1 \
-    }
-#endif
 
 /**
  * @brief data structure for topic subscription handle
@@ -222,12 +216,12 @@ typedef struct Client {
 
     char host_addr[HOST_STR_LENGTH];
 
-#ifdef AUTH_MODE_CERT
+//#ifdef AUTH_MODE_CERT    /* CMIoT ML302 annotated by YangTao@20200910 */
     char cert_file_path[FILE_PATH_MAX_LEN];  // full path of device cert file
     char key_file_path[FILE_PATH_MAX_LEN];   // full path of device key file
-#else
+//#else
     unsigned char psk_decode[DECODE_PSK_LENGTH];
-#endif
+//#endif
 
 #ifdef MQTT_RMDUP_MSG_ENABLED
 #define MQTT_MAX_REPEAT_BUF_LEN 10

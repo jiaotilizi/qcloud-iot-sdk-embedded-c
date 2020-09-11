@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Tencent is pleased to support the open source community by making IoT Hub available.
  * Copyright (C) 2018-2020 THL A29 Limited, a Tencent company. All rights reserved.
 
@@ -37,6 +37,15 @@ extern "C" {
 
 #define Max(a, b) ((a) > (b) ? (a) : (b))
 #define Min(a, b) ((a) < (b) ? (a) : (b))
+
+/* CMIoT ML302 added by YangTao@20200910 */
+typedef enum {
+	AUTH_MODE_KEY_NO_TLS 	= 0,		/* 密钥认证模式, 无TLS加密 */
+	AUTH_MODE_KEY_TLS 		= 1,		/* 密钥认证模式, TLS加密 */
+	AUTH_MODE_CERT_TLS 		= 2,		/* 证书认证模式, TLS加密 */
+	AUTH_MODE_MAX,
+} DeviceAuthMode;
+
 
 /**********************************************************************
  * QCloud IoT C-SDK Hardware Abstraction Layer
@@ -210,6 +219,14 @@ int HAL_SetDevInfo(void *pdevInfo);
  */
 int HAL_GetDevInfo(void *pdevInfo);
 
+
+/* CMIoT ML302 added by YangTao@20200910 */
+long HAL_FlashReadRaw(const char *fileName, uint8_t **dataBuff);
+int HAL_FlashRead(const char *fileName, void *data, size_t dataLen);
+int HAL_FlashWrite(const char *fileName, void *data, size_t dataLen);
+int HAL_SetAuthMode(DeviceAuthMode mode);
+DeviceAuthMode HAL_GetAuthMode(void);
+
 /**
  * @brief Get device info from a JSON file
  *
@@ -319,7 +336,7 @@ int HAL_AT_Uart_Recv(void *data, uint32_t expect_size, uint32_t *recv_size, uint
 
 /********** TLS/DTLS network sturcture and operations **********/
 
-#ifndef AUTH_WITH_NOTLS
+//#ifndef AUTH_WITH_NOTLS    /* CMIoT ML302 annotated by YangTao@20200910 */
 /**
  * @brief Define structure for TLS connection parameters
  *
@@ -328,19 +345,19 @@ typedef struct {
     const char *ca_crt;
     uint16_t    ca_crt_len;
 
-#ifdef AUTH_MODE_CERT
+//#ifdef AUTH_MODE_CERT    /* CMIoT ML302 annotated by YangTao@20200910 */
     /**
      * Device with certificate
      */
     const char *cert_file;  // public certificate file
     const char *key_file;   // pravite certificate file
-#else
+//#else
     /**
      * Device with PSK
      */
     const char *psk;     // PSK string
     const char *psk_id;  // PSK ID
-#endif
+//#endif
 
     size_t psk_length;  // PSK length
 
@@ -437,7 +454,7 @@ int HAL_DTLS_Write(uintptr_t handle, const unsigned char *data, size_t datalen, 
 int HAL_DTLS_Read(uintptr_t handle, unsigned char *data, size_t datalen, uint32_t timeout_ms, size_t *read_len);
 
 #endif  // COAP_COMM_ENABLED
-#endif  // AUTH_WITH_NOTLS
+//#endif  // AUTH_WITH_NOTLS
 
 /********** TCP network **********/
 /**

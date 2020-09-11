@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Tencent is pleased to support the open source community by making IoT Hub available.
  * Copyright (C) 2018-2020 THL A29 Limited, a Tencent company. All rights reserved.
 
@@ -64,7 +64,7 @@ int network_init(Network *pNetwork)
 #endif
             break;
 
-#ifndef AUTH_WITH_NOTLS
+//#ifndef AUTH_WITH_NOTLS    /* CMIoT ML302 annotated by YangTao@20200910 */
         case NETWORK_TLS:
             pNetwork->init         = network_tls_init;
             pNetwork->connect      = network_tls_connect;
@@ -74,10 +74,10 @@ int network_init(Network *pNetwork)
             pNetwork->is_connected = is_network_connected;
             pNetwork->handle       = 0;
             break;
-#endif
+//#endif
 
 #ifdef COAP_COMM_ENABLED
-#ifdef AUTH_WITH_NOTLS
+//#ifdef AUTH_WITH_NOTLS    /* CMIoT ML302 annotated by YangTao@20200910 */
         case NETWORK_UDP:
             pNetwork->init         = network_udp_init;
             pNetwork->connect      = network_udp_connect;
@@ -87,7 +87,7 @@ int network_init(Network *pNetwork)
             pNetwork->is_connected = is_network_connected;
             pNetwork->handle       = 0;
             break;
-#else
+//#else
         case NETWORK_DTLS:
             pNetwork->init         = network_dtls_init;
             pNetwork->connect      = network_dtls_connect;
@@ -97,7 +97,7 @@ int network_init(Network *pNetwork)
             pNetwork->is_connected = is_network_connected;
             pNetwork->handle       = 0;
             break;
-#endif
+//#endif
 #endif
         default:
             Log_e("unknown network type: %d", pNetwork->type);

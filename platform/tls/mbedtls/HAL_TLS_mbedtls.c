@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Tencent is pleased to support the open source community by making IoT Hub available.
  * Copyright (C) 2018-2020 THL A29 Limited, a Tencent company. All rights reserved.
 
@@ -19,7 +19,7 @@ extern "C" {
 
 #include "qcloud_iot_import.h"
 
-#ifndef AUTH_WITH_NOTLS
+//#ifndef AUTH_WITH_NOTLS    /* CMIoT ML302 annotated by YangTao@20200910 */
 
 #include <errno.h>
 #include <stdint.h>
@@ -35,9 +35,9 @@ extern "C" {
 #include "utils_param_check.h"
 #include "utils_timer.h"
 
-#ifndef AUTH_MODE_CERT
+//#ifndef AUTH_MODE_CERT    /* CMIoT ML302 annotated by YangTao@20200910 */
 static const int ciphersuites[] = {MBEDTLS_TLS_PSK_WITH_AES_128_CBC_SHA, MBEDTLS_TLS_PSK_WITH_AES_256_CBC_SHA, 0};
-#endif
+//#endif
 
 /**
  * @brief data structure for mbedtls SSL connection
@@ -108,35 +108,66 @@ static int _mbedtls_client_init(TLSDataParams *pDataParams, TLSConnectParams *pC
         }
     }
 
-#ifdef AUTH_MODE_CERT
-    if (pConnectParams->cert_file != NULL && pConnectParams->key_file != NULL) {
-        if ((ret = mbedtls_x509_crt_parse_file(&(pDataParams->client_cert), pConnectParams->cert_file)) != 0) {
-            Log_e("load client cert file failed returned 0x%x", ret < 0 ? -ret : ret);
-            return QCLOUD_ERR_SSL_CERT;
-        }
+//#ifdef AUTH_MODE_CERT    /* CMIoT ML302 modified by YangTao@20200910 */
+	if (AUTH_MODE_CERT_TLS == HAL_GetAuthMode()) {
+	    if (pConnectParams->cert_file != NULL && pConnectParams->key_file != NULL) {
+			/* CMIoT ML302 modified by YangTao@20200910 */
+			long 		   data_length = 0;
+            unsigned char *data_buffer = NULL;
 
-        if ((ret = mbedtls_pk_parse_keyfile(&(pDataParams->private_key), pConnectParams->key_file, "")) != 0) {
-            Log_e("load client key file failed returned 0x%x", ret < 0 ? -ret : ret);
-            return QCLOUD_ERR_SSL_CERT;
-        }
-    } else {
-        Log_d("cert_file/key_file is empty!|cert_file=%s|key_file=%s", pConnectParams->cert_file,
-              pConnectParams->key_file);
-    }
-#else
-    if (pConnectParams->psk != NULL && pConnectParams->psk_id != NULL) {
-        const char *psk_id = pConnectParams->psk_id;
-        ret                = mbedtls_ssl_conf_psk(&(pDataParams->ssl_conf), (unsigned char *)pConnectParams->psk,
-                                   pConnectParams->psk_length, (const unsigned char *)psk_id, strlen(psk_id));
-    } else {
-        Log_d("psk/pskid is empty!|psk=%s|psd_id=%s", pConnectParams->psk, pConnectParams->psk_id);
-    }
+			if (0 > (data_length = HAL_FlashReadRaw(pConnectParams->cert_file, &data_buffer))) {
+				Log_e("parse file %s to string error", pConnectParams->cert_file);
+                return QCLOUD_ERR_SSL_CERT;
+            } else {
+                data_length += 1;
+            }
+	        if ((ret = mbedtls_x509_crt_parse(&(pDataParams->client_cert), data_buffer, data_length)) != 0) {
+	            Log_e("load client cert file failed returned 0x%x", ret < 0 ? -ret : ret);
+				if (NULL != data_buffer) {
+					HAL_Free(data_buffer);
+				}
+	            return QCLOUD_ERR_SSL_CERT;
+	        }
+			if (NULL != data_buffer) {
+				HAL_Free(data_buffer);
+			}
 
-    if (0 != ret) {
-        Log_e("mbedtls_ssl_conf_psk fail: 0x%x", ret < 0 ? -ret : ret);
-        return ret;
-    }
-#endif
+			if (0 > (data_length = HAL_FlashReadRaw(pConnectParams->cert_file, &data_buffer))) {
+				Log_e("parse file %s to string error", pConnectParams->cert_file);
+                return QCLOUD_ERR_SSL_CERT;
+            } else {
+                data_length += 1;
+            }
+	        if ((ret = mbedtls_pk_parse_key(&(pDataParams->private_key), data_buffer, data_length, NULL, 0)) != 0) {
+	            Log_e("load client key file failed returned 0x%x", ret < 0 ? -ret : ret);
+				if (NULL != data_buffer) {
+					HAL_Free(data_buffer);
+				}
+	            return QCLOUD_ERR_SSL_CERT;
+	        }
+			if (NULL != data_buffer) {
+				HAL_Free(data_buffer);
+			}
+	    } else {
+	        Log_d("cert_file/key_file is empty!|cert_file=%s|key_file=%s", pConnectParams->cert_file,
+	              pConnectParams->key_file);
+	    }
+//#else
+	} else {
+	    if (pConnectParams->psk != NULL && pConnectParams->psk_id != NULL) {
+	        const char *psk_id = pConnectParams->psk_id;
+	        ret                = mbedtls_ssl_conf_psk(&(pDataParams->ssl_conf), (unsigned char *)pConnectParams->psk,
+	                                   pConnectParams->psk_length, (const unsigned char *)psk_id, strlen(psk_id));
+	    } else {
+	        Log_d("psk/pskid is empty!|psk=%s|psd_id=%s", pConnectParams->psk, pConnectParams->psk_id);
+	    }
+
+	    if (0 != ret) {
+	        Log_e("mbedtls_ssl_conf_psk fail: 0x%x", ret < 0 ? -ret : ret);
+	        return ret;
+	    }
+//#endif
+	}
 
     return QCLOUD_RET_SUCCESS;
 }
@@ -223,12 +254,14 @@ uintptr_t HAL_TLS_Connect(TLSConnectParams *pConnectParams, const char *host, in
         goto error;
     }
 
-#ifndef AUTH_MODE_CERT
-    // ciphersuites selection for PSK device
-    if (pConnectParams->psk != NULL) {
-        mbedtls_ssl_conf_ciphersuites(&(pDataParams->ssl_conf), ciphersuites);
-    }
-#endif
+//#ifndef AUTH_MODE_CERT    /* CMIoT ML302 modified by YangTao@20200910 */
+	if (AUTH_MODE_CERT_TLS != HAL_GetAuthMode()) {
+	    // ciphersuites selection for PSK device
+	    if (pConnectParams->psk != NULL) {
+	        mbedtls_ssl_conf_ciphersuites(&(pDataParams->ssl_conf), ciphersuites);
+	    }
+	}
+//#endif
 
     // Set the hostname to check against the received server certificate and sni
     if ((ret = mbedtls_ssl_set_hostname(&(pDataParams->ssl), host)) != 0) {
@@ -377,4 +410,4 @@ int HAL_TLS_Read(uintptr_t handle, unsigned char *msg, size_t totalLen, uint32_t
 }
 #endif
 
-#endif
+//#endif

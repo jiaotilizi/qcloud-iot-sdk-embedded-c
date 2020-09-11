@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Tencent is pleased to support the open source community by making IoT Hub available.
  * Copyright (C) 2018-2020 THL A29 Limited, a Tencent company. All rights reserved.
 
@@ -85,12 +85,12 @@ typedef struct {
     char *product_id;   // product ID
     char *device_name;  // device name
 
-#ifdef AUTH_MODE_CERT
+//#ifdef AUTH_MODE_CERT    /* CMIoT ML302 annotated by YangTao@20200910 */
     char cert_file[FILE_PATH_MAX_LEN];  // full path of device cert file
     char key_file[FILE_PATH_MAX_LEN];   // full path of device key file
-#else
+//#else
     char *device_secret;  // device secret
-#endif
+//#endif
 
     uint32_t         command_timeout;  // coap timeout value when waiting for ACK/response
     unsigned char    max_retry_count;  // CoAP max sending retry count
@@ -98,17 +98,11 @@ typedef struct {
 
 } CoAPInitParams;
 
-#ifdef AUTH_MODE_CERT
+/* CMIoT ML302 modified by YangTao@20200910 */
 #define DEFAULT_COAPINIT_PARAMS              \
     {                                        \
-        NULL, NULL, {0}, {0}, 2000, 5, { 0 } \
+        NULL, NULL, {0}, {0}, NULL, 2000, 5, { 0 } \
     }
-#else
-#define DEFAULT_COAPINIT_PARAMS          \
-    {                                    \
-        NULL, NULL, NULL, 2000, 5, { 0 } \
-    }
-#endif
 
 /**
  * @brief Construct CoAP Client and connect to server

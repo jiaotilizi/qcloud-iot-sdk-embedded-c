@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Tencent is pleased to support the open source community by making IoT Hub available.
  * Copyright (C) 2018-2020 THL A29 Limited, a Tencent company. All rights reserved.
 
@@ -94,12 +94,15 @@ static void _copy_shadow_init_params_to_mqtt(MQTTInitParams *pMqttInitParams, Sh
     pMqttInitParams->device_name = shadowInitParams->device_name;
     pMqttInitParams->product_id  = shadowInitParams->product_id;
 
-#ifdef AUTH_MODE_CERT
-    memcpy(pMqttInitParams->cert_file, shadowInitParams->cert_file, FILE_PATH_MAX_LEN);
-    memcpy(pMqttInitParams->key_file, shadowInitParams->key_file, FILE_PATH_MAX_LEN);
-#else
-    pMqttInitParams->device_secret = shadowInitParams->device_secret;
-#endif
+//#ifdef AUTH_MODE_CERT    /* CMIoT ML302 modified by YangTao@20200910 */
+	if (AUTH_MODE_CERT_TLS == HAL_GetAuthMode()) {
+	    memcpy(pMqttInitParams->cert_file, shadowInitParams->cert_file, FILE_PATH_MAX_LEN);
+	    memcpy(pMqttInitParams->key_file, shadowInitParams->key_file, FILE_PATH_MAX_LEN);
+//#else
+	} else {
+    	pMqttInitParams->device_secret = shadowInitParams->device_secret;
+//#endif
+	}
 
     pMqttInitParams->command_timeout        = shadowInitParams->command_timeout;
     pMqttInitParams->keep_alive_interval_ms = shadowInitParams->keep_alive_interval_ms;

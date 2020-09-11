@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Tencent is pleased to support the open source community by making IoT Hub available.
  * Copyright (C) 2018-2020 THL A29 Limited, a Tencent company. All rights reserved.
 
@@ -59,9 +59,9 @@ struct Network {
     // for AT: 0 = valid connection, MAX_UNSINGED_INT = invalid
     uintptr_t handle;
 
-#ifndef AUTH_WITH_NOTLS
+//#ifndef AUTH_WITH_NOTLS    /* CMIoT ML302 annotated by YangTao@20200910 */
     SSLConnectParams ssl_connect_params;
-#endif
+//#endif
 
     const char * host;  // server address
     int          port;  // server port
@@ -96,29 +96,29 @@ int  network_tcp_connect(Network *pNetwork);
 int  network_tcp_init(Network *pNetwork);
 #endif
 
-#ifndef AUTH_WITH_NOTLS
+//#ifndef AUTH_WITH_NOTLS    /* CMIoT ML302 annotated by YangTao@20200910 */
 int network_tls_read(Network *pNetwork, unsigned char *data, size_t datalen, uint32_t timeout_ms, size_t *read_len);
 int network_tls_write(Network *pNetwork, unsigned char *data, size_t datalen, uint32_t timeout_ms, size_t *written_len);
 void network_tls_disconnect(Network *pNetwork);
 int  network_tls_connect(Network *pNetwork);
 int  network_tls_init(Network *pNetwork);
-#endif
+//#endif
 
 #ifdef COAP_COMM_ENABLED
-#ifdef AUTH_WITH_NOTLS
+//#ifdef AUTH_WITH_NOTLS    /* CMIoT ML302 annotated by YangTao@20200910 */
 int network_udp_read(Network *pNetwork, unsigned char *data, size_t datalen, uint32_t timeout_ms, size_t *read_len);
 int network_udp_write(Network *pNetwork, unsigned char *data, size_t datalen, uint32_t timeout_ms, size_t *written_len);
 void network_udp_disconnect(Network *pNetwork);
 int  network_udp_connect(Network *pNetwork);
 int  network_udp_init(Network *pNetwork);
-#else
+//#else
 int  network_dtls_read(Network *pNetwork, unsigned char *data, size_t datalen, uint32_t timeout_ms, size_t *read_len);
 int  network_dtls_write(Network *pNetwork, unsigned char *data, size_t datalen, uint32_t timeout_ms,
                         size_t *written_len);
 void network_dtls_disconnect(Network *pNetwork);
 int  network_dtls_connect(Network *pNetwork);
 int  network_dtls_init(Network *pNetwork);
-#endif
+//#endif
 #endif
 
 #ifdef __cplusplus

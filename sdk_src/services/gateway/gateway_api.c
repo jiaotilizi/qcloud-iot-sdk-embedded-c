@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Tencent is pleased to support the open source community by making IoT Hub available.
  * Copyright (C) 2018-2020 THL A29 Limited, a Tencent company. All rights reserved.
 
@@ -278,15 +278,18 @@ int IOT_Gateway_Subdev_Bind(void *client, GatewayParam *param, DeviceInfo *pBind
         return QCLOUD_ERR_FAILURE;
     }
     memset(payload, 0, GATEWAY_PAYLOAD_BUFFER_LEN);
-#ifdef AUTH_MODE_CERT
-    size = HAL_Snprintf(payload, GATEWAY_PAYLOAD_BUFFER_LEN + 1, GATEWAY_PAYLOAD_OP_FMT, GATEWAY_BIND_OP_STR,
-                        pBindSubDevInfo->product_id, pBindSubDevInfo->device_name, sign, nonce, timestamp, "hmacsha1",
-                        "certificate");
-#else
-    size = HAL_Snprintf(payload, GATEWAY_PAYLOAD_BUFFER_LEN + 1, GATEWAY_PAYLOAD_OP_FMT, GATEWAY_BIND_OP_STR,
-                        pBindSubDevInfo->product_id, pBindSubDevInfo->device_name, sign, nonce, timestamp, "hmacsha1",
-                        "psk");
-#endif
+//#ifdef AUTH_MODE_CERT    /* CMIoT ML302 modified by YangTao@20200910 */
+	if (AUTH_MODE_CERT_TLS == HAL_GetAuthMode()) {
+	    size = HAL_Snprintf(payload, GATEWAY_PAYLOAD_BUFFER_LEN + 1, GATEWAY_PAYLOAD_OP_FMT, GATEWAY_BIND_OP_STR,
+	                        pBindSubDevInfo->product_id, pBindSubDevInfo->device_name, sign, nonce, timestamp, "hmacsha1",
+	                        "certificate");
+//#else
+	} else {
+	    size = HAL_Snprintf(payload, GATEWAY_PAYLOAD_BUFFER_LEN + 1, GATEWAY_PAYLOAD_OP_FMT, GATEWAY_BIND_OP_STR,
+	                        pBindSubDevInfo->product_id, pBindSubDevInfo->device_name, sign, nonce, timestamp, "hmacsha1",
+	                        "psk");
+//#endif
+	}
 
     if (size < 0 || size > GATEWAY_PAYLOAD_BUFFER_LEN) {
         Log_e("buf size < payload length!");

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Tencent is pleased to support the open source community by making IoT Hub available.
  * Copyright (C) 2018-2020 THL A29 Limited, a Tencent company. All rights reserved.
 
@@ -94,7 +94,7 @@ typedef struct {
 static LogUploaderStruct *sg_uploader               = NULL;
 static bool               sg_log_uploader_init_done = false;
 
-#ifdef AUTH_MODE_CERT
+//#ifdef AUTH_MODE_CERT    /* CMIoT ML302 annotated by YangTao@20200910 */
 static int _gen_key_from_file(const char *file_path)
 {
     FILE *fp;
@@ -132,7 +132,7 @@ static int _gen_key_from_file(const char *file_path)
 
     return 0;
 }
-#endif
+//#endif
 
 static long _get_system_time(void)
 {
@@ -492,16 +492,19 @@ int init_log_uploader(LogUploadInitParams *init_params)
     int i;
     for (i = 0; i < LOG_BUF_FIXED_HEADER_SIZE; i++) sg_log_buffer[i] = '#';
 
-#ifdef AUTH_MODE_CERT
-    if (_gen_key_from_file(init_params->sign_key) != 0) {
-        UPLOAD_ERR("gen_key_from_file failed");
-        goto err_exit;
-    }
-    sg_log_buffer[SIGNATURE_SIZE] = 'C';
-#else
-    memcpy(sg_sign_key, init_params->sign_key, key_len > SIGN_KEY_SIZE ? SIGN_KEY_SIZE : key_len);
-    sg_log_buffer[SIGNATURE_SIZE] = 'P';
-#endif
+//#ifdef AUTH_MODE_CERT    /* CMIoT ML302 modified by YangTao@20200910 */
+	if (AUTH_MODE_CERT_TLS == HAL_GetAuthMode()) {
+	    if (_gen_key_from_file(init_params->sign_key) != 0) {
+	        UPLOAD_ERR("gen_key_from_file failed");
+	        goto err_exit;
+	    }
+	    sg_log_buffer[SIGNATURE_SIZE] = 'C';
+//#else
+	} else {
+	    memcpy(sg_sign_key, init_params->sign_key, key_len > SIGN_KEY_SIZE ? SIGN_KEY_SIZE : key_len);
+	    sg_log_buffer[SIGNATURE_SIZE] = 'P';
+//#endif
+	}
 
     memcpy(sg_log_buffer + SIGNATURE_SIZE + CTRL_BYTES_SIZE, init_params->product_id, MAX_SIZE_OF_PRODUCT_ID);
     memcpy(sg_log_buffer + SIGNATURE_SIZE + CTRL_BYTES_SIZE + MAX_SIZE_OF_PRODUCT_ID, init_params->device_name,

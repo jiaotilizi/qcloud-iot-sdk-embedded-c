@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Tencent is pleased to support the open source community by making IoT Hub available.
  * Copyright (C) 2018-2020 THL A29 Limited, a Tencent company. All rights reserved.
 
@@ -56,12 +56,12 @@ typedef struct {
     char device_name[MAX_SIZE_OF_DEVICE_NAME + 1];
     char client_id[MAX_SIZE_OF_CLIENT_ID + 1];
 
-#ifdef AUTH_MODE_CERT
+//#ifdef AUTH_MODE_CERT    /* CMIoT ML302 annotated by YangTao@20200910 */
     char dev_cert_file_name[MAX_SIZE_OF_DEVICE_CERT_FILE_NAME + 1];
     char dev_key_file_name[MAX_SIZE_OF_DEVICE_SECRET_FILE_NAME + 1];
-#else
+//#else
     char device_secret[MAX_SIZE_OF_DEVICE_SECRET + 1];
-#endif
+//#endif
 
 #ifdef DEV_DYN_REG_ENABLED
     char product_secret[MAX_SIZE_OF_PRODUCT_SECRET + 1];

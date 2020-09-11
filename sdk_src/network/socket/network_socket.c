@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Tencent is pleased to support the open source community by making IoT Hub available.
  * Copyright (C) 2018-2020 THL A29 Limited, a Tencent company. All rights reserved.
 
@@ -74,7 +74,9 @@ void network_tcp_disconnect(Network *pNetwork)
     return;
 }
 
-#if (defined COAP_COMM_ENABLED) && (defined AUTH_WITH_NOTLS)
+/* CMIoT ML302 modified by YangTao@20200910 */
+//#if (defined COAP_COMM_ENABLED) && (defined AUTH_WITH_NOTLS)
+#if (defined COAP_COMM_ENABLED)
 
 int network_udp_init(Network *pNetwork)
 {

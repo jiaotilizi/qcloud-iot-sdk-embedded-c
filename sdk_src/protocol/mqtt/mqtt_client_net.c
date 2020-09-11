@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Tencent is pleased to support the open source community by making IoT Hub available.
  * Copyright (C) 2018-2020 THL A29 Limited, a Tencent company. All rights reserved.
 
@@ -44,10 +44,13 @@ int qcloud_iot_mqtt_network_init(Network *pNetwork)
 
     /* first choice: TLS */
     pNetwork->type = NETWORK_TLS;
-
-#ifdef AUTH_WITH_NOTLS
-    pNetwork->type = NETWORK_TCP;
-#endif
+	
+/* CMIoT ML302 modified by YangTao@20200910 */
+//#ifdef AUTH_WITH_NOTLS
+	if (AUTH_MODE_KEY_NO_TLS == HAL_GetAuthMode()) {
+    	pNetwork->type = NETWORK_TCP;
+	}
+//#endif
 
     rc                     = network_init(pNetwork);
     pNetwork->is_connected = qcloud_iot_mqtt_tls_is_connected;

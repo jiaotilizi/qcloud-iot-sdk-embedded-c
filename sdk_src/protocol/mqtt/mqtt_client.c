@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Tencent is pleased to support the open source community by making IoT Hub available.
  * Copyright (C) 2018-2020 THL A29 Limited, a Tencent company. All rights reserved.
 
@@ -83,29 +83,32 @@ void *IOT_MQTT_Construct(MQTTInitParams *pParams)
     connect_params.keep_alive_interval = Min(pParams->keep_alive_interval_ms / 1000, 690);
     connect_params.clean_session       = pParams->clean_session;
     connect_params.auto_connect_enable = pParams->auto_connect_enable;
-#if defined(AUTH_WITH_NOTLS) && defined(AUTH_MODE_KEY)
-    if (pParams->device_secret == NULL) {
-        Log_e("Device secret is null!");
-        qcloud_iot_mqtt_fini(mqtt_client);
-        HAL_Free(mqtt_client);
-        pParams->err_code = QCLOUD_ERR_INVAL;
-        return NULL;
-    }
-    size_t src_len = strlen(pParams->device_secret);
-    size_t len;
-    memset(mqtt_client->psk_decode, 0x00, DECODE_PSK_LENGTH);
-    rc                               = qcloud_iot_utils_base64decode(mqtt_client->psk_decode, DECODE_PSK_LENGTH, &len,
-                                       (unsigned char *)pParams->device_secret, src_len);
-    connect_params.device_secret     = (char *)mqtt_client->psk_decode;
-    connect_params.device_secret_len = len;
-    if (rc != QCLOUD_RET_SUCCESS) {
-        Log_e("Device secret decode err, secret:%s", pParams->device_secret);
-        qcloud_iot_mqtt_fini(mqtt_client);
-        HAL_Free(mqtt_client);
-        pParams->err_code = QCLOUD_ERR_INVAL;
-        return NULL;
-    }
-#endif
+/* CMIoT ML302 modified by YangTao@20200910 */
+//#if defined(AUTH_WITH_NOTLS) && defined(AUTH_MODE_KEY)
+	if (AUTH_MODE_KEY_NO_TLS == HAL_GetAuthMode()) {
+	    if (pParams->device_secret == NULL) {
+	        Log_e("Device secret is null!");
+	        qcloud_iot_mqtt_fini(mqtt_client);
+	        HAL_Free(mqtt_client);
+	        pParams->err_code = QCLOUD_ERR_INVAL;
+	        return NULL;
+	    }
+	    size_t src_len = strlen(pParams->device_secret);
+	    size_t len;
+	    memset(mqtt_client->psk_decode, 0x00, DECODE_PSK_LENGTH);
+	    rc                               = qcloud_iot_utils_base64decode(mqtt_client->psk_decode, DECODE_PSK_LENGTH, &len,
+	                                       (unsigned char *)pParams->device_secret, src_len);
+	    connect_params.device_secret     = (char *)mqtt_client->psk_decode;
+	    connect_params.device_secret_len = len;
+	    if (rc != QCLOUD_RET_SUCCESS) {
+	        Log_e("Device secret decode err, secret:%s", pParams->device_secret);
+	        qcloud_iot_mqtt_fini(mqtt_client);
+	        HAL_Free(mqtt_client);
+	        pParams->err_code = QCLOUD_ERR_INVAL;
+	        return NULL;
+	    }
+	}
+//#endif
 
     rc = qcloud_iot_mqtt_connect(mqtt_client, &connect_params);
     if (rc != QCLOUD_RET_SUCCESS) {
@@ -430,52 +433,65 @@ int qcloud_iot_mqtt_init(Qcloud_IoT_Client *pClient, MQTTInitParams *pParams)
         goto error;
     }
     pClient->list_sub_wait_ack->free = HAL_Free;
-
-#ifndef AUTH_WITH_NOTLS
+	
+    /* CMIoT ML302 modified by YangTao@20200910 */
+	DeviceAuthMode auth_mode = HAL_GetAuthMode();
+	if (AUTH_MODE_MAX <= auth_mode) {
+		Log_e("auth mode is illegal!");
+        goto error;
+	}
+	
+//#ifndef AUTH_WITH_NOTLS    /* CMIoT ML302 modified by YangTao@20200910 */
     // device param for TLS connection
-#ifdef AUTH_MODE_CERT
-    Log_d("cert file: %s", pParams->cert_file);
-    Log_d("key file: %s", pParams->key_file);
+//#ifdef AUTH_MODE_CERT    /* CMIoT ML302 modified by YangTao@20200910 */
+	if (AUTH_MODE_KEY_NO_TLS != auth_mode) {
+		if (AUTH_MODE_CERT_TLS == auth_mode) {
+		    Log_d("cert file: %s", pParams->cert_file);
+		    Log_d("key file: %s", pParams->key_file);
 
-    strncpy(pClient->cert_file_path, pParams->cert_file, FILE_PATH_MAX_LEN - 1);
-    strncpy(pClient->key_file_path, pParams->key_file, FILE_PATH_MAX_LEN - 1);
+		    strncpy(pClient->cert_file_path, pParams->cert_file, FILE_PATH_MAX_LEN - 1);
+		    strncpy(pClient->key_file_path, pParams->key_file, FILE_PATH_MAX_LEN - 1);
 
-    pClient->network_stack.ssl_connect_params.cert_file  = pClient->cert_file_path;
-    pClient->network_stack.ssl_connect_params.key_file   = pClient->key_file_path;
-    pClient->network_stack.ssl_connect_params.ca_crt     = iot_ca_get();
-    pClient->network_stack.ssl_connect_params.ca_crt_len = strlen(pClient->network_stack.ssl_connect_params.ca_crt);
-#else
-    if (pParams->device_secret != NULL) {
-        size_t src_len = strlen(pParams->device_secret);
-        size_t len;
-        memset(pClient->psk_decode, 0x00, DECODE_PSK_LENGTH);
-        qcloud_iot_utils_base64decode(pClient->psk_decode, DECODE_PSK_LENGTH, &len,
-                                      (unsigned char *)pParams->device_secret, src_len);
-        pClient->network_stack.ssl_connect_params.psk        = (char *)pClient->psk_decode;
-        pClient->network_stack.ssl_connect_params.psk_length = len;
-    } else {
-        Log_e("psk is empty!");
-        IOT_FUNC_EXIT_RC(QCLOUD_ERR_INVAL);
-    }
-    if (strnlen(pClient->device_info.client_id, MAX_SIZE_OF_CLIENT_ID) == 0) {
-        Log_e("psk id is empty!");
-        IOT_FUNC_EXIT_RC(QCLOUD_ERR_INVAL);
-    }
-    pClient->network_stack.ssl_connect_params.psk_id     = pClient->device_info.client_id;
-    pClient->network_stack.ssl_connect_params.ca_crt     = NULL;
-    pClient->network_stack.ssl_connect_params.ca_crt_len = 0;
-#endif
+		    pClient->network_stack.ssl_connect_params.cert_file  = pClient->cert_file_path;
+		    pClient->network_stack.ssl_connect_params.key_file   = pClient->key_file_path;
+		    pClient->network_stack.ssl_connect_params.ca_crt     = iot_ca_get();
+		    pClient->network_stack.ssl_connect_params.ca_crt_len = strlen(pClient->network_stack.ssl_connect_params.ca_crt);
+//#else
+		} else {
+		    if (pParams->device_secret != NULL) {
+		        size_t src_len = strlen(pParams->device_secret);
+		        size_t len;
+		        memset(pClient->psk_decode, 0x00, DECODE_PSK_LENGTH);
+		        qcloud_iot_utils_base64decode(pClient->psk_decode, DECODE_PSK_LENGTH, &len,
+		                                      (unsigned char *)pParams->device_secret, src_len);
+		        pClient->network_stack.ssl_connect_params.psk        = (char *)pClient->psk_decode;
+		        pClient->network_stack.ssl_connect_params.psk_length = len;
+		    } else {
+		        Log_e("psk is empty!");
+		        IOT_FUNC_EXIT_RC(QCLOUD_ERR_INVAL);
+		    }
+		    if (strnlen(pClient->device_info.client_id, MAX_SIZE_OF_CLIENT_ID) == 0) {
+		        Log_e("psk id is empty!");
+		        IOT_FUNC_EXIT_RC(QCLOUD_ERR_INVAL);
+		    }
+		    pClient->network_stack.ssl_connect_params.psk_id     = pClient->device_info.client_id;
+		    pClient->network_stack.ssl_connect_params.ca_crt     = NULL;
+		    pClient->network_stack.ssl_connect_params.ca_crt_len = 0;
+//#endif
+		}
 
-    pClient->network_stack.host = pClient->host_addr;
-    pClient->network_stack.port = MQTT_SERVER_PORT_TLS;
-    pClient->network_stack.ssl_connect_params.timeout_ms =
-        pClient->command_timeout_ms > QCLOUD_IOT_TLS_HANDSHAKE_TIMEOUT ? pClient->command_timeout_ms
-                                                                       : QCLOUD_IOT_TLS_HANDSHAKE_TIMEOUT;
+	    pClient->network_stack.host = pClient->host_addr;
+	    pClient->network_stack.port = MQTT_SERVER_PORT_TLS;
+	    pClient->network_stack.ssl_connect_params.timeout_ms =
+	        pClient->command_timeout_ms > QCLOUD_IOT_TLS_HANDSHAKE_TIMEOUT ? pClient->command_timeout_ms
+	                                                                       : QCLOUD_IOT_TLS_HANDSHAKE_TIMEOUT;
 
-#else
-    pClient->network_stack.host = pClient->host_addr;
-    pClient->network_stack.port = MQTT_SERVER_PORT_NOTLS;
-#endif
+//#else
+	} else {
+	    pClient->network_stack.host = pClient->host_addr;
+	    pClient->network_stack.port = MQTT_SERVER_PORT_NOTLS;
+//#endif
+	}
 
     // init network stack
     qcloud_iot_mqtt_network_init(&(pClient->network_stack));

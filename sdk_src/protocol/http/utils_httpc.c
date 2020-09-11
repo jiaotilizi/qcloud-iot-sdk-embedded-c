@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Tencent is pleased to support the open source community by making IoT Hub available.
  * Copyright (C) 2018-2020 THL A29 Limited, a Tencent company. All rights reserved.
 
@@ -697,14 +697,16 @@ static int _http_network_init(Network *pNetwork, const char *host, int port, con
         return QCLOUD_ERR_INVAL;
     }
     pNetwork->type = NETWORK_TCP;
-#ifndef AUTH_WITH_NOTLS
-    if (ca_crt_dir != NULL) {
-        pNetwork->ssl_connect_params.ca_crt     = ca_crt_dir;
-        pNetwork->ssl_connect_params.ca_crt_len = strlen(pNetwork->ssl_connect_params.ca_crt);
-        pNetwork->ssl_connect_params.timeout_ms = 10000;
-        pNetwork->type                          = NETWORK_TLS;
-    }
-#endif
+//#ifndef AUTH_WITH_NOTLS    /* CMIoT ML302 modified by YangTao@20200910 */
+	if (AUTH_MODE_KEY_NO_TLS != HAL_GetAuthMode()) {
+	    if (ca_crt_dir != NULL) {
+	        pNetwork->ssl_connect_params.ca_crt     = ca_crt_dir;
+	        pNetwork->ssl_connect_params.ca_crt_len = strlen(pNetwork->ssl_connect_params.ca_crt);
+	        pNetwork->ssl_connect_params.timeout_ms = 10000;
+	        pNetwork->type                          = NETWORK_TLS;
+	    }
+	}
+//#endif
     pNetwork->host = host;
     pNetwork->port = port;
 

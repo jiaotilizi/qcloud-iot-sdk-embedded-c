@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Tencent is pleased to support the open source community by making IoT Hub available.
  * Copyright (C) 2018-2020 THL A29 Limited, a Tencent company. All rights reserved.
 
@@ -33,12 +33,12 @@ typedef struct {
     char *product_id;   // product ID
     char *device_name;  // device name
 
-#ifdef AUTH_MODE_CERT
+//#ifdef AUTH_MODE_CERT    /* CMIoT ML302 annotated by YangTao@20200910 */
     char cert_file[FILE_PATH_MAX_LEN];  // full path of device cert file
     char key_file[FILE_PATH_MAX_LEN];   // full path of device key file
-#else
+//#else
     char *device_secret;  // device secret
-#endif
+//#endif
 
     uint32_t         command_timeout;         // timeout value (unit: ms) for MQTT connect/pub/sub/yield
     uint32_t         keep_alive_interval_ms;  // MQTT keep alive time interval in millisecond
@@ -48,17 +48,11 @@ typedef struct {
     eShadowType      shadow_type;             // shadow type
 } ShadowInitParams;
 
-#ifdef AUTH_MODE_CERT
+/* CMIoT ML302 modified by YangTao@20200910 */
 #define DEFAULT_SHAWDOW_INIT_PARAMS                          \
     {                                                        \
-        NULL, NULL, {0}, {0}, 5000, 240 * 1000, 1, 1, {0}, 0 \
+        NULL, NULL, {0}, {0}, NULL, 5000, 240 * 1000, 1, 1, {0}, 0 \
     }
-#else
-#define DEFAULT_SHAWDOW_INIT_PARAMS                      \
-    {                                                    \
-        NULL, NULL, NULL, 5000, 240 * 1000, 1, 1, {0}, 0 \
-    }
-#endif
 
 /**
  * @brief Type of shadow request ACK

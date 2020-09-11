@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Tencent is pleased to support the open source community by making IoT Hub available.
  * Copyright (C) 2018-2020 THL A29 Limited, a Tencent company. All rights reserved.
 
@@ -23,8 +23,8 @@ extern "C" {
 
 #include "qcloud_iot_import.h"
 
-#ifndef AUTH_WITH_NOTLS
-#if defined(AUTH_MODE_CERT) || defined(DEV_DYN_REG_ENABLED)
+//#ifndef AUTH_WITH_NOTLS    /* CMIoT ML302 annotated by YangTao@20200910 */
+//#if defined(AUTH_MODE_CERT) || defined(DEV_DYN_REG_ENABLED)
 static const char *iot_ca_crt = {
     "-----BEGIN CERTIFICATE-----\r\n"
     "MIIDxTCCAq2gAwIBAgIJALM1winYO2xzMA0GCSqGSIb3DQEBCwUAMHkxCzAJBgNV\r\n"
@@ -49,7 +49,7 @@ static const char *iot_ca_crt = {
     "RT16Amn780rQLWojr70q7o7QP5tO0wDPfCdFSc6CQFq/ngOzYag0kJ2F+O5U6+kS\r\n"
     "QVrcRBDxzx/G\r\n"
     "-----END CERTIFICATE-----"};
-#endif
+//#endif
 
 #ifdef OTA_USE_HTTPS
 static const char *iot_https_ca_crt = {
@@ -101,24 +101,24 @@ static const char *iot_https_ca_crt = {
     "K1pp74P1S8SqtCr4fKGxhZSM9AyHDPSsQPhZSZg=\r\n"
     "-----END CERTIFICATE-----"};
 #endif
-#endif
+//#endif
 
 const char *iot_ca_get()
 {
-#ifndef AUTH_WITH_NOTLS
-#if defined(AUTH_MODE_CERT) || defined(DEV_DYN_REG_ENABLED)
+//#ifndef AUTH_WITH_NOTLS    /* CMIoT ML302 annotated by YangTao@20200910 */
+//#if defined(AUTH_MODE_CERT) || defined(DEV_DYN_REG_ENABLED)    /* CMIoT ML302 annotated by YangTao@20200910 */
     return iot_ca_crt;
-#else
-    return NULL;
-#endif
-#else
-    return NULL;
-#endif
+//#else
+//    return NULL;
+//#endif
+//#else
+//    return NULL;
+//#endif
 }
 
 const char *iot_https_ca_get()
 {
-#ifndef AUTH_WITH_NOTLS
+//#ifndef AUTH_WITH_NOTLS    /* CMIoT ML302 annotated by YangTao@20200910 */
 
 #ifdef OTA_USE_HTTPS
     return iot_https_ca_crt;
@@ -126,9 +126,9 @@ const char *iot_https_ca_get()
     return NULL;
 #endif
 
-#else
-    return NULL;
-#endif
+//#else
+//    return NULL;
+//#endif
 }
 
 #ifdef __cplusplus
